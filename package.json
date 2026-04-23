@@ -1,0 +1,64 @@
+{
+  "name": "capgate",
+  "version": "0.0.1",
+  "description": "Compile MCP tool manifests into sandbox policies (bwrap, egress rules, and more).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "capgate": "dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "node -e \"import('node:fs').then(fs => fs.rmSync('dist', { recursive: true, force: true }))\"",
+    "prebuild": "npm run clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:update-goldens": "cross-env UPDATE_GOLDEN=1 vitest run",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "policy",
+    "sandbox",
+    "capability",
+    "bwrap",
+    "bubblewrap",
+    "typescript"
+  ],
+  "author": {
+    "name": "Raju KC",
+    "email": "kc.razu@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/razukc/capgate.git"
+  },
+  "homepage": "https://github.com/razukc/capgate#readme",
+  "bugs": {
+    "url": "https://github.com/razukc/capgate/issues"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.3.3",
+    "vitest": "^3.2.4"
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "argv": [
+    "--unshare-uts",
+    "--unshare-cgroup-try",
+    "--die-with-parent",
+    "--new-session",
+    "--ro-bind-try",
+    "/usr",
+    "/usr",
+    "--ro-bind-try",
+    "/lib",
+    "/lib",
+    "--ro-bind-try",
+    "/lib64",
+    "/lib64",
+    "--ro-bind-try",
+    "/bin",
+    "/bin",
+    "--ro-bind-try",
+    "/sbin",
+    "/sbin",
+    "--ro-bind-try",
+    "/etc/ssl",
+    "/etc/ssl",
+    "--ro-bind-try",
+    "/etc/ca-certificates",
+    "/etc/ca-certificates",
+    "--proc",
+    "/proc",
+    "--dev",
+    "/dev",
+    "--bind",
+    "/tmp",
+    "/tmp",
+    "--bind-try",
+    "/tmp/.X11-unix",
+    "/tmp/.X11-unix",
+    "--clearenv",
+    "--setenv",
+    "PATH",
+    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "--setenv",
+    "HOME",
+    "/tmp"
+  ],
+  "egress": [
+    {
+      "host": "*",
+      "port": null,
+      "blockPrivate": true
+    }
+  ],
+  "envInjections": [
+    "DISPLAY"
+  ],
+  "assertions": [
+    {
+      "id": "puppeteer.script_is_untrusted",
+      "description": "evaluate() runs model-controlled JS in the page; host must treat output as untrusted"
+    }
+  ],
+  "notes": [
+    "nestedSandbox: keeping user/pid/ipc namespaces for inner sandbox compatibility",
+    "fs: \"/tmp/**\" lowered to directory bind \"/tmp\" — bwrap binds directories, not globs. Fine-grained glob enforcement is the server's job.",
+    "fs: binding host /tmp exposes all user tmpfiles to the sandbox; prefer a scoped subdirectory like /tmp/<server-name>.",
+    "exec: chromium (resolved from PATH inside sandbox)",
+    "net: 1 endpoint(s) declared — host MUST route outbound traffic through an egress proxy honoring egress[]"
+  ]
+}

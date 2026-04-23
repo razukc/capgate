@@ -1,0 +1,72 @@
+{
+  "name": "@modelcontextprotocol/server-filesystem",
+  "version": "0.6.2",
+  "serverCapabilities": [],
+  "tools": [
+    {
+      "name": "read_text_file",
+      "description": "Read complete contents of a file as text",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "read_media_file",
+      "description": "Read an image or audio file, returning base64 data with MIME type",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "read_multiple_files",
+      "description": "Read multiple files simultaneously",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "list_directory",
+      "description": "List directory contents with [FILE] or [DIR] prefixes",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "list_directory_with_sizes",
+      "description": "Display directory contents with file sizes",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "directory_tree",
+      "description": "Recursive JSON tree of directory contents",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "search_files",
+      "description": "Recursively search for files matching patterns",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "get_file_info",
+      "description": "Retrieve file or directory metadata",
+      "capabilities": ["fs:read:/workspace/**"]
+    },
+    {
+      "name": "list_allowed_directories",
+      "description": "Display directories accessible to the server",
+      "capabilities": []
+    },
+    {
+      "name": "create_directory",
+      "description": "Create new directory or ensure it exists",
+      "capabilities": ["fs:create:/workspace/**"]
+    },
+    {
+      "name": "write_file",
+      "description": "Create new file or overwrite existing",
+      "capabilities": ["fs:write:/workspace/**"]
+    },
+    {
+      "name": "edit_file",
+      "description": "Make selective edits using pattern matching",
+      "capabilities": ["fs:read,write:/workspace/**"]
+    },
+    {
+      "name": "move_file",
+      "description": "Move or rename files and directories",
+      "capabilities": ["fs:read,write,delete:/workspace/**"]
+    }
+  ]
+}

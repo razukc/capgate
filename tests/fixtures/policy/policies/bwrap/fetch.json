@@ -1,0 +1,60 @@
+{
+  "argv": [
+    "--unshare-uts",
+    "--unshare-cgroup-try",
+    "--unshare-user-try",
+    "--unshare-pid",
+    "--unshare-ipc",
+    "--die-with-parent",
+    "--new-session",
+    "--ro-bind-try",
+    "/usr",
+    "/usr",
+    "--ro-bind-try",
+    "/lib",
+    "/lib",
+    "--ro-bind-try",
+    "/lib64",
+    "/lib64",
+    "--ro-bind-try",
+    "/bin",
+    "/bin",
+    "--ro-bind-try",
+    "/sbin",
+    "/sbin",
+    "--ro-bind-try",
+    "/etc/ssl",
+    "/etc/ssl",
+    "--ro-bind-try",
+    "/etc/ca-certificates",
+    "/etc/ca-certificates",
+    "--proc",
+    "/proc",
+    "--tmpfs",
+    "/tmp",
+    "--clearenv",
+    "--setenv",
+    "PATH",
+    "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "--setenv",
+    "HOME",
+    "/tmp"
+  ],
+  "egress": [
+    {
+      "host": "*",
+      "port": null,
+      "blockPrivate": true
+    }
+  ],
+  "envInjections": [],
+  "assertions": [
+    {
+      "id": "fetch.block_rfc1918",
+      "description": "outbound requests to private ranges must be rejected by the egress proxy"
+    }
+  ],
+  "notes": [
+    "net: 1 endpoint(s) declared — host MUST route outbound traffic through an egress proxy honoring egress[]"
+  ]
+}
