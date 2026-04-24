@@ -156,7 +156,9 @@ npm run test:update-goldens   # regenerate golden files after intentional change
 
 ## Contributing
 
-Design-partner stage. If you run MCP servers in production and have feedback on the grammar or adapter output, please open a [discussion](https://github.com/razukc/capgate/discussions) or file an issue with a concrete manifest and your expected output. See [CONTRIBUTING.md](CONTRIBUTING.md) for what's most useful right now.
+Design-partner stage. **Actively seeking feedback from teams reviewing MCP servers today** — please see [issue #1](https://github.com/razukc/capgate/issues/1) and share how your review process works (as much or as little as you can publicly). That is the single most valuable contribution right now.
+
+If you have a concrete manifest + unexpected compiler output, file an issue with both. See [CONTRIBUTING.md](CONTRIBUTING.md) for what else is useful.
 
 ## Security
 
