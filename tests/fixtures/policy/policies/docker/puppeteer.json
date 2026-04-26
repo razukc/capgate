@@ -1,0 +1,39 @@
+{
+  "argv": [
+    "--rm",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--read-only",
+    "--volume",
+    "/tmp:/tmp:rw",
+    "--volume",
+    "/tmp/.X11-unix:/tmp/.X11-unix:ro",
+    "--env",
+    "DISPLAY"
+  ],
+  "egress": [
+    {
+      "host": "*",
+      "port": null,
+      "blockPrivate": true
+    }
+  ],
+  "envInjections": [
+    "DISPLAY"
+  ],
+  "assertions": [
+    {
+      "id": "puppeteer.script_is_untrusted",
+      "description": "evaluate() runs model-controlled JS in the page; host must treat output as untrusted"
+    }
+  ],
+  "notes": [
+    "net: 1 endpoint(s) declared — host MUST attach the container to a network whose egress honors egress[]; do NOT use --network host",
+    "fs: \"/tmp/**\" lowered to volume mount \"/tmp\" — Docker mounts directories, not globs. Fine-grained glob enforcement is the server's job.",
+    "fs: mounting host /tmp exposes all user tmpfiles to the container; prefer a scoped subdirectory like /tmp/<server-name>.",
+    "exec: chromium (must be present in the chosen image)",
+    "nestedSandbox: declared — Docker default seccomp + dropped capabilities may break inner sandboxes (e.g. Chromium). Host MUST decide between (a) running the inner tool with its own sandbox disabled (insecure), (b) granting SYS_ADMIN + a tailored seccomp profile, or (c) using a microVM adapter (Firecracker) instead. capgate refuses to choose for you."
+  ]
+}

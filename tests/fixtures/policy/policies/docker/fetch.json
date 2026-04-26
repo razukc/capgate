@@ -1,0 +1,29 @@
+{
+  "argv": [
+    "--rm",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--read-only",
+    "--tmpfs",
+    "/tmp"
+  ],
+  "egress": [
+    {
+      "host": "*",
+      "port": null,
+      "blockPrivate": true
+    }
+  ],
+  "envInjections": [],
+  "assertions": [
+    {
+      "id": "fetch.block_rfc1918",
+      "description": "outbound requests to private ranges must be rejected by the egress proxy"
+    }
+  ],
+  "notes": [
+    "net: 1 endpoint(s) declared — host MUST attach the container to a network whose egress honors egress[]; do NOT use --network host"
+  ]
+}

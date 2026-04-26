@@ -11,7 +11,7 @@
 // YAML output) belongs behind a feature flag, not here.
 
 import { readFileSync } from 'node:fs';
-import { compile, lowerToBwrap, CompilationError } from './policy/index.js';
+import { compile, lowerToBwrap, lowerToDocker, CompilationError } from './policy/index.js';
 
 interface Args {
   command: string | undefined;
@@ -47,7 +47,7 @@ Usage:
   capgate compile <manifest.json|-> [--target bwrap] [--pretty]
 
 Options:
-  --target <name>   Adapter to lower to. Default: bwrap. Supported: bwrap.
+  --target <name>   Adapter to lower to. Default: bwrap. Supported: bwrap, docker.
   --pretty          Indent JSON output with 2 spaces.
   -h, --help        Show this message.
 
@@ -91,8 +91,11 @@ function main(): void {
       case 'bwrap':
         output = lowerToBwrap(policy);
         break;
+      case 'docker':
+        output = lowerToDocker(policy);
+        break;
       default:
-        process.stderr.write(`capgate: unsupported --target "${args.target}" (supported: bwrap)\n`);
+        process.stderr.write(`capgate: unsupported --target "${args.target}" (supported: bwrap, docker)\n`);
         process.exit(2);
     }
     const indent = args.pretty ? 2 : 0;

@@ -31,3 +31,6 @@ export type { RawServerManifest, RawToolManifest } from './compiler.js';
 
 export { lowerToBwrap } from './adapters/bwrap.js';
 export type { BwrapArtifact, BwrapOptions, EgressRule } from './adapters/bwrap.js';
+
+export { lowerToDocker } from './adapters/docker.js';
+export type { DockerArtifact, DockerOptions } from './adapters/docker.js';

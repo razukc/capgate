@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "--rm",
+    "--cap-drop",
+    "ALL",
+    "--security-opt",
+    "no-new-privileges",
+    "--read-only",
+    "--tmpfs",
+    "/tmp",
+    "--network",
+    "none",
+    "--volume",
+    "/workspace:/workspace:rw"
+  ],
+  "egress": [],
+  "envInjections": [],
+  "assertions": [],
+  "notes": [
+    "fs: \"/workspace/**\" lowered to volume mount \"/workspace\" — Docker mounts directories, not globs. Fine-grained glob enforcement is the server's job."
+  ]
+}
