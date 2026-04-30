@@ -42,4 +42,4 @@ See [SECURITY.md](SECURITY.md). Please do **not** file security issues in the pu
 
 ## License
 
-By contributing you agree your contributions are licensed under the MIT License.
+By contributing you agree your contributions are licensed under the [Apache License 2.0](LICENSE) (inbound = outbound). The Apache 2.0 license includes an explicit patent grant from contributors.

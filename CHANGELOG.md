@@ -4,6 +4,9 @@ All notable changes to capgate will be documented here. The format follows [Keep
 
 ## [Unreleased]
 
+### Changed
+- Relicensed from MIT to Apache-2.0 to add an explicit patent grant. Added `NOTICE` file. Relevant to enterprise embedding and OpenSSF norms; rationale recorded in TRACKING / 60-day-plan notes.
+
 ## [0.0.1] — 2026-04-23
 
 Initial design-partner preview release.
