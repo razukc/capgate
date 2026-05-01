@@ -2,15 +2,19 @@
 
 **Compile MCP tool manifests into sandbox policies.**
 
-`capgate` is a pure TypeScript library that reads [Model Context Protocol](https://modelcontextprotocol.io) server manifests and emits concrete sandbox policies — bubblewrap argv, egress allowlist rules, environment injection lists, and declared-but-unenforced assertions — suitable for consumption by a host runtime.
+MCP servers today either run with full host trust (Claude Desktop, most wrappers) or get wrapped in a one-size-fits-all container. Neither lets you say *this server needs `fs:read:/workspace/**` and `net:connect:api.github.com:443`, nothing else* — and have a sandbox policy fall out of that declaration.
+
+`capgate` is the missing compile step. It reads a [Model Context Protocol](https://modelcontextprotocol.io) server manifest, parses capability strings, and emits a concrete sandbox policy your host can hand straight to bubblewrap (Docker adapter shipping next).
+
+```
+manifest (JSON) → Capability[] → NormalizedPolicy → bwrap argv + egress rules + env list
+```
 
 It is a compiler, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire.
 
-```
-manifest (JSON) → Capability[] (parsed) → NormalizedPolicy (merged) → adapter output
-```
+**Validated against 10 real MCP servers** (filesystem, fetch, git, memory, time, github, postgres, sqlite, brave-search, puppeteer) — see [the inventory](tests/fixtures/policy/GO_NO_GO.md). 9/10 lower mechanically; the 10th (puppeteer) drove the `nestedSandbox` refinement.
 
-Status: **v0.0.1 — design partner preview.** The grammar, IR, and bwrap adapter are implemented and golden-tested. APIs may change before v0.1.
+Status: **v0.0.1.** Bwrap adapter is golden-tested and ready to embed. Grammar may evolve through v0.1 based on design-partner feedback.
 
 ---
 
@@ -54,7 +58,19 @@ const artifact = lowerToBwrap(policy);
 // artifact.notes  — audit-friendly diagnostics
 ```
 
-See [`tests/fixtures/policy/`](tests/fixtures/policy) for worked examples covering filesystem, fetch, and puppeteer manifests.
+The `argv` you'd hand to `bwrap` for the manifest above (abridged):
+
+```
+--unshare-net --unshare-pid --unshare-ipc --unshare-user-try
+--die-with-parent --new-session
+--ro-bind-try /usr /usr      --ro-bind-try /lib /lib
+--ro-bind-try /etc/ssl /etc/ssl
+--proc /proc --tmpfs /tmp
+--bind /workspace /workspace
+--clearenv --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+```
+
+Full golden output: [`tests/fixtures/policy/policies/bwrap/filesystem.json`](tests/fixtures/policy/policies/bwrap/filesystem.json). Worked examples for `fetch` (egress + assertions) and `puppeteer` (nested-sandbox edge case) live alongside it.
 
 ### CLI
 
@@ -66,10 +82,6 @@ cat manifest.json | capgate compile - --target bwrap
 Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
 
 ---
-
-## Why this exists
-
-MCP tool manifests declare *what* a tool does; they do not declare *what host resources it needs*. Today every runtime either trusts servers fully (Claude Desktop, most wrappers) or wraps them in a one-size-fits-all container (AIO Sandbox, E2B). Neither approach lets a security policy be *derived from the manifest*. capgate closes that gap: a pure function from `ServerManifest` to adapter-specific policies.
 
 ## Scope for v0.1
 
@@ -135,9 +147,24 @@ Chromium carries its own sandbox that fights namespace isolation. Every producti
 
 All compilation errors are fatal. There is no warning mode.
 
-## Validation
+## Validated servers
 
-Before committing to the capability-grammar abstraction, we ran a [go/no-go exercise](tests/fixtures/policy/GO_NO_GO.md) against 10 real MCP servers. 9/10 lowered mechanically to bwrap; 1 (puppeteer) surfaced the need for a `nestedSandbox` refinement; 2 (fetch, postgres) motivated the first-class `assert:` capability kind. That inventory is durable and names each server, its source, and the capability string set that should lower to it.
+Before committing to the capability-grammar abstraction, we ran a [go/no-go exercise](tests/fixtures/policy/GO_NO_GO.md) against 10 real MCP servers. The full inventory (capability strings, source links, lowering notes) lives in [`GO_NO_GO.md`](tests/fixtures/policy/GO_NO_GO.md); the summary:
+
+| Server | Capabilities (excerpt) | Status | Fixture |
+|---|---|---|---|
+| [filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | `fs:read,write:<roots>` | mechanical | [filesystem.json](tests/fixtures/policy/manifests/filesystem.json) |
+| [fetch](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) | `net:connect:*`, `assert:fetch.block_rfc1918` | mechanical (assert) | [fetch.json](tests/fixtures/policy/manifests/fetch.json) |
+| [git](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | `fs:read,write:<repo>`, `exec:spawn:git`, `net:connect:*` | mechanical | — |
+| [memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | `fs:read,write:$MEMORY_FILE_PATH` | mechanical | — |
+| [time](https://github.com/modelcontextprotocol/servers/tree/main/src/time) | `fs:read:/usr/share/zoneinfo`, `clock:tzdata` | mechanical | — |
+| [github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN` | mechanical | — |
+| [postgres](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres) | `net:connect:<db>:<port>`, `assert:postgres.read_only_txn` | mechanical (assert) | — |
+| [sqlite](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | `fs:read,write:<db_path>` | mechanical | — |
+| [brave-search](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search) | `net:connect:api.search.brave.com:443`, `env:inject:BRAVE_API_KEY` | mechanical | — |
+| [puppeteer](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/puppeteer) | `exec:spawn:chromium?nestedSandbox=true`, `ipc:connect:x11` | nested-sandbox | [puppeteer.json](tests/fixtures/policy/manifests/puppeteer.json) |
+
+Three of the ten ship as golden-file fixtures (representatives of the distinct shapes); the remaining seven follow the filesystem or github shape and are tracked in `GO_NO_GO.md` for the next grammar review. **MCP server author?** If your server isn't listed and you'd like a fixture review, [open an issue](https://github.com/razukc/capgate/issues/new) with a link to the manifest.
 
 ## Test strategy
 
