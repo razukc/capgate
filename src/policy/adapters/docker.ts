@@ -16,8 +16,8 @@
 //   - seccomp customization beyond default → out of scope for v0.1
 //   - secret value resolution → caller pulls from a secret store
 //   - inner Chromium-style sandboxes → surfaced as a note; host decides whether
-//     to add SYS_ADMIN, run unprivileged Chromium with --no-sandbox (insecure!),
-//     or mount /proc differently. This adapter refuses to silently elevate.
+//     to add SYS_ADMIN with a tailored seccomp profile or use a microVM adapter.
+//     This adapter refuses to silently elevate.
 
 import { NormalizedPolicy } from '../ir.js';
 import type { EgressRule } from './bwrap.js';
@@ -141,7 +141,7 @@ export function lowerToDocker(policy: NormalizedPolicy, opts: DockerOptions = {}
   // --privileged. The host knows whether it's running a trusted image.
   if (policy.nestedSandbox) {
     notes.push(
-      'nestedSandbox: declared — Docker default seccomp + dropped capabilities may break inner sandboxes (e.g. Chromium). Host MUST decide between (a) running the inner tool with its own sandbox disabled (insecure), (b) granting SYS_ADMIN + a tailored seccomp profile, or (c) using a microVM adapter (Firecracker) instead. capgate refuses to choose for you.'
+      'nestedSandbox: declared — Docker default seccomp + dropped capabilities may break inner sandboxes (e.g. Chromium). Host MUST decide between (a) granting SYS_ADMIN + a tailored seccomp profile, or (b) using a microVM adapter (Firecracker) instead. capgate refuses to choose for you.'
     );
   }
 

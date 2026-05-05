@@ -13,7 +13,7 @@ import { lowerToDocker, DockerArtifact } from '../../../src/policy/adapters/dock
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURE_ROOT = join(HERE, '../../fixtures/policy');
-const MANIFESTS = ['filesystem', 'fetch', 'puppeteer'] as const;
+const MANIFESTS = ['filesystem', 'fetch', 'github', 'puppeteer'] as const;
 
 const UPDATE = process.env.UPDATE_GOLDEN === '1';
 

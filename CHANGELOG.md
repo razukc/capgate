@@ -4,8 +4,19 @@ All notable changes to capgate will be documented here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.0.2] — 2026-05-03
+
+### Added
+- `lowerToDocker(policy, opts)` — second adapter, parallel shape to `lowerToBwrap`. Emits `docker run` flags (volumes, `--network`, env names, `--cap-drop=ALL`, `--security-opt=no-new-privileges`, `--read-only` rootfs by default) plus the same companion artifacts (`egress`, `envInjections`, `assertions`, `notes`).
+- CLI gains `--target docker` alongside `bwrap`.
+- Three Docker golden fixtures (filesystem, fetch, puppeteer) parallel to the bwrap goldens.
+
 ### Changed
-- Relicensed from MIT to Apache-2.0 to add an explicit patent grant. Added `NOTICE` file. Relevant to enterprise embedding and OpenSSF norms; rationale recorded in TRACKING / 60-day-plan notes.
+- Relicensed from MIT to Apache-2.0 to add an explicit patent grant. Added `NOTICE` file. Relevant to enterprise embedding and OpenSSF norms.
+
+### Design notes
+- `nestedSandbox` is surfaced as a multi-option note, not silent elevation. Docker can't keep host pid/ipc namespaces the way bwrap does; granting `SYS_ADMIN` or `--privileged` is a host trust decision, not a compiler decision.
+- `EgressRule` is shared between adapters (egress is host-policy-layer and target-agnostic). `dirForBind` is duplicated by design — future divergence in glob handling between adapters should be a deliberate edit.
 
 ## [0.0.1] — 2026-04-23
 

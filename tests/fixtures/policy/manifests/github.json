@@ -1,0 +1,29 @@
+{
+  "name": "@modelcontextprotocol/server-github",
+  "version": "0.6.2",
+  "tools": [
+    {
+      "name": "create_issue",
+      "description": "Create an issue on a GitHub repository",
+      "capabilities": [
+        "net:connect:api.github.com:443",
+        "env:inject:GITHUB_PERSONAL_ACCESS_TOKEN"
+      ]
+    },
+    {
+      "name": "search_code",
+      "description": "Search code in a local checkout",
+      "capabilities": [
+        "fs:read:/workspace/**",
+        "net:connect:api.github.com:443"
+      ]
+    },
+    {
+      "name": "apply_patch",
+      "description": "Apply a code patch to the local checkout",
+      "capabilities": [
+        "fs:read,write:/workspace/**"
+      ]
+    }
+  ]
+}

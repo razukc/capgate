@@ -34,6 +34,6 @@
     "fs: \"/tmp/**\" lowered to volume mount \"/tmp\" — Docker mounts directories, not globs. Fine-grained glob enforcement is the server's job.",
     "fs: mounting host /tmp exposes all user tmpfiles to the container; prefer a scoped subdirectory like /tmp/<server-name>.",
     "exec: chromium (must be present in the chosen image)",
-    "nestedSandbox: declared — Docker default seccomp + dropped capabilities may break inner sandboxes (e.g. Chromium). Host MUST decide between (a) running the inner tool with its own sandbox disabled (insecure), (b) granting SYS_ADMIN + a tailored seccomp profile, or (c) using a microVM adapter (Firecracker) instead. capgate refuses to choose for you."
+    "nestedSandbox: declared — Docker default seccomp + dropped capabilities may break inner sandboxes (e.g. Chromium). Host MUST decide between (a) granting SYS_ADMIN + a tailored seccomp profile, or (b) using a microVM adapter (Firecracker) instead. capgate refuses to choose for you."
   ]
 }

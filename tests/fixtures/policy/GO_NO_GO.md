@@ -13,7 +13,7 @@ Exercise performed 2026-04 against READMEs and source of the servers below. Capa
 | 3 | git | [modelcontextprotocol/servers/src/git](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | `fs:read,write:<repo>`, `exec:spawn:git`, `net:connect:*` (fetch/push) | mechanical | `exec:spawn:git` covered by the `/usr` system mount. Net needed for remote operations. |
 | 4 | memory | [modelcontextprotocol/servers/src/memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | `fs:read,write:$MEMORY_FILE_PATH` | mechanical | Same shape as filesystem with a single pinned file. |
 | 5 | time | [modelcontextprotocol/servers/src/time](https://github.com/modelcontextprotocol/servers/tree/main/src/time) | `fs:read:/usr/share/zoneinfo`, `clock:tzdata` | mechanical | Motivated the `clock:` kind — timezone data is a bind, system clock is namespaced. No net, no user data. |
-| 6 | github | [modelcontextprotocol/servers-archived/src/github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN` | mechanical | Host pinning via egress proxy. Env-injection is the fourth primitive after fs/net/exec. |
+| 6 | github | [modelcontextprotocol/servers-archived/src/github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN`, `fs:read,write:/workspace/**` | mechanical | Host pinning via egress proxy. Env-injection is the fourth primitive after fs/net/exec. Codified in [`manifests/github.json`](manifests/github.json) as a 3-tool union (create_issue + search_code + apply_patch) demonstrating per-tool→server-level merging. |
 | 7 | postgres | [modelcontextprotocol/servers-archived/src/postgres](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres) | `net:connect:<db>:<port>`, `assert:postgres.read_only_txn` | mechanical + **motivated `assert:`** | "Read-only SQL" is enforced by `BEGIN READ ONLY TRANSACTION` inside the server, not by the sandbox. Silently dropping the guarantee would be a security lie; the `assert:` kind keeps it in audit. |
 | 8 | sqlite | [modelcontextprotocol/servers-archived/src/sqlite](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | `fs:read,write:<db_path>` | mechanical | Same shape as memory. |
 | 9 | brave-search | [modelcontextprotocol/servers-archived/src/brave-search](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search) | `net:connect:api.search.brave.com:443`, `env:inject:BRAVE_API_KEY` | mechanical | Same shape as github. |
@@ -36,13 +36,14 @@ The exercise also surfaced two findings that shaped the IR:
 
 ## Fixtures codified
 
-Three of the ten are persisted as golden-file fixtures (representatives of the three distinct shapes, not an exhaustive set):
+Four of the ten are persisted as golden-file fixtures (representatives of the distinct shapes, not an exhaustive set):
 
-- [`manifests/filesystem.json`](manifests/filesystem.json) — pure-FS shape (covers 9/10 real servers)
-- [`manifests/fetch.json`](manifests/fetch.json) — `net` + `assert` (enforceable-vs-declared split)
-- [`manifests/puppeteer.json`](manifests/puppeteer.json) — `nestedSandbox` edge case
+- [`manifests/filesystem.json`](manifests/filesystem.json) — pure-FS shape (covers 9/10 real servers).
+- [`manifests/fetch.json`](manifests/fetch.json) — `net` + `assert` (enforceable-vs-declared split).
+- [`manifests/github.json`](manifests/github.json) — `net` (host-pinned) + `env:inject` + `fs`, with three tools that union into a server-level policy. Exercises the multi-tool merge path and is the README flagship example.
+- [`manifests/puppeteer.json`](manifests/puppeteer.json) — `nestedSandbox` edge case.
 
-The remaining 7 (git, memory, time, github, postgres, sqlite, brave-search) have hand-written capability lists in this document but are not yet codified as fixtures. They follow the filesystem or github shape and are low-value as additional golden files until the grammar or IR changes.
+The remaining 6 (git, memory, time, postgres, sqlite, brave-search) have hand-written capability lists in this document but are not yet codified as fixtures. They follow the filesystem or github shape and are low-value as additional golden files until the grammar or IR changes.
 
 ## Caveat
 

@@ -4,17 +4,17 @@
 
 MCP servers today either run with full host trust (Claude Desktop, most wrappers) or get wrapped in a one-size-fits-all container. Neither lets you say *this server needs `fs:read:/workspace/**` and `net:connect:api.github.com:443`, nothing else* — and have a sandbox policy fall out of that declaration.
 
-`capgate` is the missing compile step. It reads a [Model Context Protocol](https://modelcontextprotocol.io) server manifest, parses capability strings, and emits a concrete sandbox policy your host can hand straight to bubblewrap (Docker adapter shipping next).
+`capgate` is the missing compile step. It reads a [Model Context Protocol](https://modelcontextprotocol.io) server manifest, parses capability strings, and emits a concrete sandbox policy your host can hand straight to bubblewrap or `docker run`.
 
 ```
-manifest (JSON) → Capability[] → NormalizedPolicy → bwrap argv + egress rules + env list
+manifest (JSON) → Capability[] → NormalizedPolicy → adapter (bwrap | docker) → argv + egress + env + assertions
 ```
 
 It is a compiler, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire.
 
 **Validated against 10 real MCP servers** (filesystem, fetch, git, memory, time, github, postgres, sqlite, brave-search, puppeteer) — see [the inventory](tests/fixtures/policy/GO_NO_GO.md). 9/10 lower mechanically; the 10th (puppeteer) drove the `nestedSandbox` refinement.
 
-Status: **v0.0.1.** Bwrap adapter is golden-tested and ready to embed. Grammar may evolve through v0.1 based on design-partner feedback.
+Status: **v0.0.2.** Two adapters (`bwrap`, `docker`) are golden-tested and ready to embed. Grammar may evolve through v0.1 based on design-partner feedback.
 
 ---
 
@@ -26,57 +26,92 @@ npm install capgate
 
 Requires Node.js ≥ 18.
 
-## Quick example
+## Example
+
+Consider an MCP `github` server that an agent uses with a personal access token. The threat: a tool description carrying adversarial text triggers a request to attacker-controlled infrastructure, exfiltrating the PAT. A default container won't stop this — it inherits the host environment and reaches any host on the internet. capgate compiles the manifest into a policy that does.
+
+Three tools, three capability kinds, lowered to both adapters:
 
 ```ts
-import { compile, lowerToBwrap } from 'capgate';
+import { compile, lowerToBwrap, lowerToDocker } from 'capgate';
 
 const manifest = {
-  name: 'filesystem',
+  name: '@modelcontextprotocol/server-github',
   version: '0.6.2',
   tools: [
     {
-      name: 'read_file',
-      description: 'Read a file from the workspace.',
-      inputSchema: { type: 'object' },
-      capabilities: ['fs:read:/workspace/**'],
+      name: 'create_issue',
+      description: 'Create an issue on a GitHub repository',
+      capabilities: [
+        'net:connect:api.github.com:443',
+        'env:inject:GITHUB_PERSONAL_ACCESS_TOKEN',
+      ],
     },
     {
-      name: 'write_file',
-      description: 'Write a file to the workspace.',
-      inputSchema: { type: 'object' },
-      capabilities: ['fs:read,write,create:/workspace/**'],
+      name: 'search_code',
+      description: 'Search code in a local checkout',
+      capabilities: [
+        'fs:read:/workspace/**',
+        'net:connect:api.github.com:443',
+      ],
+    },
+    {
+      name: 'apply_patch',
+      description: 'Apply a code patch to the local checkout',
+      capabilities: ['fs:read,write:/workspace/**'],
     },
   ],
 };
 
 const policy = compile(manifest);
-const artifact = lowerToBwrap(policy);
 
-// artifact.argv   — ready for execFile("bwrap", argv)
-// artifact.egress — host egress proxy rules (empty here)
-// artifact.notes  — audit-friendly diagnostics
+const bwrap = lowerToBwrap(policy);
+const docker = lowerToDocker(policy, { readOnlyRootfs: true });
+
+// Both artifacts share the same shape:
+//   .argv          — flags ready for execFile()
+//   .egress        — host egress-proxy allowlist (compiler-emitted, host-enforced)
+//   .envInjections — env var names the host must inject from a secret store
+//   .assertions    — declared guarantees the sandbox cannot enforce; host verifies
+//   .notes         — audit-friendly diagnostics (drift, edge cases, host decisions)
 ```
 
-The `argv` you'd hand to `bwrap` for the manifest above (abridged):
+The compiler unions per-tool capabilities into a server-level policy: `apply_patch` widens `/workspace` from `:ro` to `:rw`, and only one env name (`GITHUB_PERSONAL_ACCESS_TOKEN`) survives the merge. Both artifacts produce the same `egress` entry, which is the load-bearing line — an egress proxy honoring it refuses any outbound request that isn't `api.github.com:443`, blocking PAT exfiltration to a third party.
+
+```jsonc
+// docker.egress  ===  bwrap.egress
+[{ "host": "api.github.com", "port": 443, "blockPrivate": true }]
+```
+
+The `argv` for each adapter (`docker` shown in full; `bwrap` abridged):
 
 ```
---unshare-net --unshare-pid --unshare-ipc --unshare-user-try
+# docker (full)
+--rm --cap-drop ALL --security-opt no-new-privileges --read-only
+--tmpfs /tmp
+--volume /workspace:/workspace:rw
+--env GITHUB_PERSONAL_ACCESS_TOKEN
+
+# bwrap (abridged — see fixture for full output)
+--unshare-uts --unshare-cgroup-try --unshare-user-try --unshare-pid --unshare-ipc
 --die-with-parent --new-session
---ro-bind-try /usr /usr      --ro-bind-try /lib /lib
---ro-bind-try /etc/ssl /etc/ssl
---proc /proc --tmpfs /tmp
+--ro-bind-try /usr /usr   --ro-bind-try /lib /lib   --ro-bind-try /etc/ssl /etc/ssl
+--proc /proc   --tmpfs /tmp
 --bind /workspace /workspace
---clearenv --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+--clearenv   --setenv PATH /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+--setenv HOME /tmp
 ```
 
-Full golden output: [`tests/fixtures/policy/policies/bwrap/filesystem.json`](tests/fixtures/policy/policies/bwrap/filesystem.json). Worked examples for `fetch` (egress + assertions) and `puppeteer` (nested-sandbox edge case) live alongside it.
+Note what's *missing* from the docker `argv`: no inherited host env, no host network, no extra capabilities, no writable rootfs. The `--env GITHUB_PERSONAL_ACCESS_TOKEN` line names the only secret that crosses the boundary; the host injects its value from a secret store at exec time. capgate emits the policy; enforcement is the host's job.
+
+Full golden outputs: [`bwrap/github.json`](tests/fixtures/policy/policies/bwrap/github.json), [`docker/github.json`](tests/fixtures/policy/policies/docker/github.json). Worked examples for `filesystem`, `fetch` (egress + assertions), and `puppeteer` (nested-sandbox edge case) live alongside them.
 
 ### CLI
 
 ```bash
-capgate compile manifest.json --target bwrap --pretty
-cat manifest.json | capgate compile - --target bwrap
+capgate compile manifest.json --target bwrap  --pretty
+capgate compile manifest.json --target docker --pretty
+cat manifest.json | capgate compile - --target docker
 ```
 
 Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
@@ -151,20 +186,20 @@ All compilation errors are fatal. There is no warning mode.
 
 Before committing to the capability-grammar abstraction, we ran a [go/no-go exercise](tests/fixtures/policy/GO_NO_GO.md) against 10 real MCP servers. The full inventory (capability strings, source links, lowering notes) lives in [`GO_NO_GO.md`](tests/fixtures/policy/GO_NO_GO.md); the summary:
 
-| Server | Capabilities (excerpt) | Status | Fixture |
-|---|---|---|---|
-| [filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | `fs:read,write:<roots>` | mechanical | [filesystem.json](tests/fixtures/policy/manifests/filesystem.json) |
-| [fetch](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) | `net:connect:*`, `assert:fetch.block_rfc1918` | mechanical (assert) | [fetch.json](tests/fixtures/policy/manifests/fetch.json) |
-| [git](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | `fs:read,write:<repo>`, `exec:spawn:git`, `net:connect:*` | mechanical | — |
-| [memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | `fs:read,write:$MEMORY_FILE_PATH` | mechanical | — |
-| [time](https://github.com/modelcontextprotocol/servers/tree/main/src/time) | `fs:read:/usr/share/zoneinfo`, `clock:tzdata` | mechanical | — |
-| [github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN` | mechanical | — |
-| [postgres](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres) | `net:connect:<db>:<port>`, `assert:postgres.read_only_txn` | mechanical (assert) | — |
-| [sqlite](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | `fs:read,write:<db_path>` | mechanical | — |
-| [brave-search](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search) | `net:connect:api.search.brave.com:443`, `env:inject:BRAVE_API_KEY` | mechanical | — |
-| [puppeteer](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/puppeteer) | `exec:spawn:chromium?nestedSandbox=true`, `ipc:connect:x11` | nested-sandbox | [puppeteer.json](tests/fixtures/policy/manifests/puppeteer.json) |
+| Server | Capabilities (excerpt) | Status | Manifest | bwrap | docker |
+|---|---|---|---|---|---|
+| [filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | `fs:read,write:<roots>` | mechanical | [filesystem.json](tests/fixtures/policy/manifests/filesystem.json) | [✓](tests/fixtures/policy/policies/bwrap/filesystem.json) | [✓](tests/fixtures/policy/policies/docker/filesystem.json) |
+| [fetch](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) | `net:connect:*`, `assert:fetch.block_rfc1918` | mechanical (assert) | [fetch.json](tests/fixtures/policy/manifests/fetch.json) | [✓](tests/fixtures/policy/policies/bwrap/fetch.json) | [✓](tests/fixtures/policy/policies/docker/fetch.json) |
+| [git](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | `fs:read,write:<repo>`, `exec:spawn:git`, `net:connect:*` | mechanical | — | — | — |
+| [memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | `fs:read,write:$MEMORY_FILE_PATH` | mechanical | — | — | — |
+| [time](https://github.com/modelcontextprotocol/servers/tree/main/src/time) | `fs:read:/usr/share/zoneinfo`, `clock:tzdata` | mechanical | — | — | — |
+| [github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN` | mechanical | — | — | — |
+| [postgres](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres) | `net:connect:<db>:<port>`, `assert:postgres.read_only_txn` | mechanical (assert) | — | — | — |
+| [sqlite](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | `fs:read,write:<db_path>` | mechanical | — | — | — |
+| [brave-search](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search) | `net:connect:api.search.brave.com:443`, `env:inject:BRAVE_API_KEY` | mechanical | — | — | — |
+| [puppeteer](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/puppeteer) | `exec:spawn:chromium?nestedSandbox=true`, `ipc:connect:x11` | nested-sandbox | [puppeteer.json](tests/fixtures/policy/manifests/puppeteer.json) | [✓](tests/fixtures/policy/policies/bwrap/puppeteer.json) | [✓](tests/fixtures/policy/policies/docker/puppeteer.json) |
 
-Three of the ten ship as golden-file fixtures (representatives of the distinct shapes); the remaining seven follow the filesystem or github shape and are tracked in `GO_NO_GO.md` for the next grammar review. **MCP server author?** If your server isn't listed and you'd like a fixture review, [open an issue](https://github.com/razukc/capgate/issues/new) with a link to the manifest.
+Three of the ten ship as golden-file fixtures for both adapters (representatives of the distinct shapes — pure-fs, net+assert, nested-sandbox); the remaining seven follow the filesystem or github shape and are tracked in `GO_NO_GO.md` for the next grammar review. **MCP server author?** If your server isn't listed and you'd like a fixture review, [open an issue](https://github.com/razukc/capgate/issues/new) with a link to the manifest.
 
 ## Test strategy
 
