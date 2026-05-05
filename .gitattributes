@@ -1,0 +1,4 @@
+# Golden-file fixtures and manifests are compared byte-for-byte against
+# serialized JSON output (which always uses LF). Pin them to LF so Windows
+# checkouts with core.autocrlf=true don't break the tests.
+tests/fixtures/policy/**/*.json text eol=lf
