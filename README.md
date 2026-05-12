@@ -10,7 +10,7 @@ MCP servers today either run with full host trust (Claude Desktop, most wrappers
 manifest (JSON) → Capability[] → NormalizedPolicy → adapter (bwrap | docker) → argv + egress + env + assertions
 ```
 
-It is a compiler, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire.
+It is a compiler, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire. Its job is to make the sandbox boundary **reviewable in a PR before the first agent call** — what the server is allowed to reach lives in the repo, not in someone's `docker run` muscle memory.
 
 **For platform and security engineers** who can't ship MCP servers under blanket host trust and don't want to hand-write bwrap argv or `docker run` flags per server. **Not for** end-user agent UIs (this isn't a runtime), or for teams who want post-hoc tool-call auditing (different layer — see [How capgate compares](#how-capgate-compares)).
 
