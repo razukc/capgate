@@ -12,9 +12,7 @@ manifest (JSON) → Capability[] → NormalizedPolicy → adapter (bwrap | docke
 
 It is a compiler, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire.
 
-**Validated against 10 real MCP servers** (filesystem, fetch, git, memory, time, github, postgres, sqlite, brave-search, puppeteer) — see [the inventory](tests/fixtures/policy/GO_NO_GO.md). 9/10 lower mechanically; the 10th (puppeteer) drove the `nestedSandbox` refinement.
-
-Status: **v0.0.2.** Two adapters (`bwrap`, `docker`) are golden-tested and ready to embed. Grammar may evolve through v0.1 based on design-partner feedback.
+**For platform and security engineers** who can't ship MCP servers under blanket host trust and don't want to hand-write bwrap argv or `docker run` flags per server. **Not for** end-user agent UIs (this isn't a runtime), or for teams who want post-hoc tool-call auditing (different layer — see [How capgate compares](#how-capgate-compares)).
 
 ---
 
@@ -26,11 +24,43 @@ npm install capgate
 
 Requires Node.js ≥ 18.
 
-## Example
+## 30-second example
 
-Consider an MCP `github` server that an agent uses with a personal access token. The threat: a tool description carrying adversarial text triggers a request to attacker-controlled infrastructure, exfiltrating the PAT. A default container won't stop this — it inherits the host environment and reaches any host on the internet. capgate compiles the manifest into a policy that does.
+```ts
+import { compile, lowerToDocker } from 'capgate';
 
-Three tools, three capability kinds, lowered to both adapters:
+const docker = lowerToDocker(compile({
+  name: 'my-server',
+  version: '0.1.0',
+  tools: [{ name: 'read_file', capabilities: ['fs:read:/workspace/**'] }],
+}));
+
+console.log(docker.argv.join(' '));
+// → --rm --cap-drop ALL --security-opt no-new-privileges --read-only
+//   --tmpfs /tmp --network none --volume /workspace:/workspace:ro
+```
+
+One capability in, one container policy out. No declared network → `--network none`. Read-only declared → `:ro` mount. No env declared → no env crosses the boundary. The CLI prints the same artifact for `bwrap`.
+
+## CLI
+
+```bash
+capgate compile manifest.json --target bwrap  --pretty
+capgate compile manifest.json --target docker --pretty
+cat manifest.json | capgate compile - --target docker
+```
+
+Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
+
+---
+
+## Worked example: `github` server with PAT
+
+The 30-second example is a single tool with a single capability. A realistic MCP server has several tools, several capability kinds, and a threat model that motivates the sandbox in the first place.
+
+**The threat.** An MCP `github` server runs with a personal access token in its environment. A tool description carrying adversarial text triggers an outbound request to attacker-controlled infrastructure, exfiltrating the PAT. A default container won't stop this — it inherits the host environment and reaches any host on the internet.
+
+**The verdict.** capgate compiles the manifest below into a policy whose egress allowlist contains exactly one entry: `api.github.com:443`. An egress proxy honoring that allowlist refuses any outbound request that isn't api.github.com, blocking PAT exfiltration to a third party. No host env is inherited; only `GITHUB_PERSONAL_ACCESS_TOKEN` is named for the host's secret store to inject at exec time.
 
 ```ts
 import { compile, lowerToBwrap, lowerToDocker } from 'capgate';
@@ -64,7 +94,6 @@ const manifest = {
 };
 
 const policy = compile(manifest);
-
 const bwrap = lowerToBwrap(policy);
 const docker = lowerToDocker(policy, { readOnlyRootfs: true });
 
@@ -76,14 +105,14 @@ const docker = lowerToDocker(policy, { readOnlyRootfs: true });
 //   .notes         — audit-friendly diagnostics (drift, edge cases, host decisions)
 ```
 
-The compiler unions per-tool capabilities into a server-level policy: `apply_patch` widens `/workspace` from `:ro` to `:rw`, and only one env name (`GITHUB_PERSONAL_ACCESS_TOKEN`) survives the merge. Both artifacts produce the same `egress` entry, which is the load-bearing line — an egress proxy honoring it refuses any outbound request that isn't `api.github.com:443`, blocking PAT exfiltration to a third party.
+The compiler unions per-tool capabilities into a server-level policy: `apply_patch` widens `/workspace` from `:ro` to `:rw`, and only one env name survives the merge.
 
 ```jsonc
 // docker.egress  ===  bwrap.egress
 [{ "host": "api.github.com", "port": 443, "blockPrivate": true }]
 ```
 
-The `argv` for each adapter (`docker` shown in full; `bwrap` abridged):
+Adapter `argv` (docker shown in full; bwrap abridged):
 
 ```
 # docker (full)
@@ -102,34 +131,60 @@ The `argv` for each adapter (`docker` shown in full; `bwrap` abridged):
 --setenv HOME /tmp
 ```
 
-Note what's *missing* from the docker `argv`: no inherited host env, no host network, no extra capabilities, no writable rootfs. The `--env GITHUB_PERSONAL_ACCESS_TOKEN` line names the only secret that crosses the boundary; the host injects its value from a secret store at exec time. capgate emits the policy; enforcement is the host's job.
+Note what's *missing* from the docker `argv`: no inherited host env, no host network, no extra capabilities, no writable rootfs. capgate emits the policy; enforcement is the host's job.
 
 Full golden outputs: [`bwrap/github.json`](tests/fixtures/policy/policies/bwrap/github.json), [`docker/github.json`](tests/fixtures/policy/policies/docker/github.json). Worked examples for `filesystem`, `fetch` (egress + assertions), and `puppeteer` (nested-sandbox edge case) live alongside them.
 
-### CLI
+---
 
-```bash
-capgate compile manifest.json --target bwrap  --pretty
-capgate compile manifest.json --target docker --pretty
-cat manifest.json | capgate compile - --target docker
-```
+## What's stable, what's evolving
 
-Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
+`v0.0.x` is published for adopters who want to pin against capgate today. Stability commitments:
+
+| Surface | Status in v0.0.x |
+|---|---|
+| Capability string grammar (`fs`, `net`, `env`, `assert` kinds) | **Stable.** String form will not change; new refinements are additive. |
+| Adapter output shape (`argv`, `egress`, `envInjections`, `assertions`, `notes`) | **Stable.** Fields are additive; existing fields keep their semantics. |
+| `compile()` and `lowerToBwrap` / `lowerToDocker` exports | **Stable.** |
+| `exec`, `ipc`, `clock` capability kinds | **Usable.** May gain refinements (like `exec:?nestedSandbox=true` did); existing forms keep working. |
+| Adapter option objects (e.g. `lowerToDocker(policy, { readOnlyRootfs })`) | **Evolving.** Will expand in v0.1 as more adapters land. |
+| `assert:` validator hook | **Metadata-only in v0.0.x.** Runtime hook lands in v0.2. |
+
+Pin a minor range against `v0.0.x` for production review pipelines. Grammar additions land in `v0.1`; existing strings keep parsing.
+
+## How capgate compares
+
+MCP-server security splits across several layers. capgate sits at compile-time policy emission. The other layers are not competitors — most teams running MCP servers in production end up wanting more than one.
+
+| Approach | What it does | When you'd use it |
+|---|---|---|
+| **Compile-time policy emission** (capgate) | Reads a manifest, emits sandbox argv + egress allowlist. Static artifact, no runtime. | You want the sandbox policy reviewable in PR before the server ever runs. |
+| **Runtime inspection** | Watches a running MCP server, flags risky tool calls against a threat catalog. | You want post-hoc audit signal on a server you didn't author. |
+| **Signed receipts / decision logs** | Cryptographically logs each tool invocation. | You need a tamper-evident trail of which tools ran with what arguments. |
+| **API gateway / per-request auth** | Authorizes each MCP request at a network boundary. | Your concern is *who* is allowed to call *which* tools, not what the tool can reach. |
+
+If you arrived here from a comparison post and you wanted runtime inspection or signed receipts, capgate isn't that — but the artifact it emits can be the input to either.
 
 ---
 
-## Scope for v0.1
+## Validated servers
 
-**In scope:**
-- Capability grammar covering `fs`, `net`, `exec`, `env`, `ipc`, `clock`, `assert`.
-- Lowering to three targets: `bwrap` (Linux namespace sandbox), egress-proxy rules (net allowlist), Worker `resourceLimits` (in-process JS isolation).
-- Golden-file tests from real MCP server manifests.
+Before committing to the capability-grammar abstraction, we ran a [go/no-go exercise](tests/fixtures/policy/GO_NO_GO.md) against 10 real MCP servers. The full inventory (capability strings, source links, lowering notes) lives in [`GO_NO_GO.md`](tests/fixtures/policy/GO_NO_GO.md); the summary:
 
-**Out of scope (deferred):**
-- Firecracker / microVM adapter — needed for production but not for proving the abstraction.
-- E2B / Daytona / Blaxel adapters — API stability varies; wait for a design partner.
-- seccomp-bpf syscall filters — requires a separate IR; out of the capability model.
-- MCP client/server implementation — this library consumes manifests, it does not speak MCP on the wire.
+| Server | Capabilities (excerpt) | Status | Manifest | bwrap | docker |
+|---|---|---|---|---|---|
+| [filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | `fs:read,write:<roots>` | mechanical | [filesystem.json](tests/fixtures/policy/manifests/filesystem.json) | [✓](tests/fixtures/policy/policies/bwrap/filesystem.json) | [✓](tests/fixtures/policy/policies/docker/filesystem.json) |
+| [fetch](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) | `net:connect:*`, `assert:fetch.block_rfc1918` | mechanical (assert) | [fetch.json](tests/fixtures/policy/manifests/fetch.json) | [✓](tests/fixtures/policy/policies/bwrap/fetch.json) | [✓](tests/fixtures/policy/policies/docker/fetch.json) |
+| [git](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | `fs:read,write:<repo>`, `exec:spawn:git`, `net:connect:*` | mechanical | — | — | — |
+| [memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | `fs:read,write:$MEMORY_FILE_PATH` | mechanical | — | — | — |
+| [time](https://github.com/modelcontextprotocol/servers/tree/main/src/time) | `fs:read:/usr/share/zoneinfo`, `clock:tzdata` | mechanical | — | — | — |
+| [github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN` | mechanical | [github.json](tests/fixtures/policy/manifests/github.json) | [✓](tests/fixtures/policy/policies/bwrap/github.json) | [✓](tests/fixtures/policy/policies/docker/github.json) |
+| [postgres](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres) | `net:connect:<db>:<port>`, `assert:postgres.read_only_txn` | mechanical (assert) | — | — | — |
+| [sqlite](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | `fs:read,write:<db_path>` | mechanical | — | — | — |
+| [brave-search](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search) | `net:connect:api.search.brave.com:443`, `env:inject:BRAVE_API_KEY` | mechanical | — | — | — |
+| [puppeteer](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/puppeteer) | `exec:spawn:chromium?nestedSandbox=true`, `ipc:connect:x11` | nested-sandbox | [puppeteer.json](tests/fixtures/policy/manifests/puppeteer.json) | [✓](tests/fixtures/policy/policies/bwrap/puppeteer.json) | [✓](tests/fixtures/policy/policies/docker/puppeteer.json) |
+
+Four of the ten ship as golden-file fixtures for both adapters; the rest follow one of the four shapes and are tracked in `GO_NO_GO.md` for the next grammar review. **MCP server author?** If your server isn't listed and you'd like a fixture review, [open an issue](https://github.com/razukc/capgate/issues/new) with a link to the manifest.
 
 ## Capability grammar
 
@@ -149,6 +204,19 @@ assert:postgres.read_only_txn:"all queries run in READ ONLY TRANSACTION"
 ```
 
 The grammar rejects ambiguity (relative paths, bad ports, non-UPPER_SNAKE env vars) at parse time — fail-closed, always.
+
+## Scope for v0.1
+
+**In scope:**
+- Capability grammar covering `fs`, `net`, `exec`, `env`, `ipc`, `clock`, `assert`.
+- Lowering to three targets: `bwrap` (Linux namespace sandbox), egress-proxy rules (net allowlist), Worker `resourceLimits` (in-process JS isolation).
+- Golden-file tests from real MCP server manifests.
+
+**Out of scope (deferred):**
+- Firecracker / microVM adapter — needed for production but not for proving the abstraction.
+- E2B / Daytona / Blaxel adapters — API stability varies; wait for a design partner.
+- seccomp-bpf syscall filters — requires a separate IR; out of the capability model.
+- MCP client/server implementation — this library consumes manifests, it does not speak MCP on the wire.
 
 ## Design notes
 
@@ -182,25 +250,6 @@ Chromium carries its own sandbox that fights namespace isolation. Every producti
 
 All compilation errors are fatal. There is no warning mode.
 
-## Validated servers
-
-Before committing to the capability-grammar abstraction, we ran a [go/no-go exercise](tests/fixtures/policy/GO_NO_GO.md) against 10 real MCP servers. The full inventory (capability strings, source links, lowering notes) lives in [`GO_NO_GO.md`](tests/fixtures/policy/GO_NO_GO.md); the summary:
-
-| Server | Capabilities (excerpt) | Status | Manifest | bwrap | docker |
-|---|---|---|---|---|---|
-| [filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem) | `fs:read,write:<roots>` | mechanical | [filesystem.json](tests/fixtures/policy/manifests/filesystem.json) | [✓](tests/fixtures/policy/policies/bwrap/filesystem.json) | [✓](tests/fixtures/policy/policies/docker/filesystem.json) |
-| [fetch](https://github.com/modelcontextprotocol/servers/tree/main/src/fetch) | `net:connect:*`, `assert:fetch.block_rfc1918` | mechanical (assert) | [fetch.json](tests/fixtures/policy/manifests/fetch.json) | [✓](tests/fixtures/policy/policies/bwrap/fetch.json) | [✓](tests/fixtures/policy/policies/docker/fetch.json) |
-| [git](https://github.com/modelcontextprotocol/servers/tree/main/src/git) | `fs:read,write:<repo>`, `exec:spawn:git`, `net:connect:*` | mechanical | — | — | — |
-| [memory](https://github.com/modelcontextprotocol/servers/tree/main/src/memory) | `fs:read,write:$MEMORY_FILE_PATH` | mechanical | — | — | — |
-| [time](https://github.com/modelcontextprotocol/servers/tree/main/src/time) | `fs:read:/usr/share/zoneinfo`, `clock:tzdata` | mechanical | — | — | — |
-| [github](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/github) | `net:connect:api.github.com:443`, `env:inject:GITHUB_PERSONAL_ACCESS_TOKEN` | mechanical | — | — | — |
-| [postgres](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/postgres) | `net:connect:<db>:<port>`, `assert:postgres.read_only_txn` | mechanical (assert) | — | — | — |
-| [sqlite](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/sqlite) | `fs:read,write:<db_path>` | mechanical | — | — | — |
-| [brave-search](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/brave-search) | `net:connect:api.search.brave.com:443`, `env:inject:BRAVE_API_KEY` | mechanical | — | — | — |
-| [puppeteer](https://github.com/modelcontextprotocol/servers-archived/tree/main/src/puppeteer) | `exec:spawn:chromium?nestedSandbox=true`, `ipc:connect:x11` | nested-sandbox | [puppeteer.json](tests/fixtures/policy/manifests/puppeteer.json) | [✓](tests/fixtures/policy/policies/bwrap/puppeteer.json) | [✓](tests/fixtures/policy/policies/docker/puppeteer.json) |
-
-Three of the ten ship as golden-file fixtures for both adapters (representatives of the distinct shapes — pure-fs, net+assert, nested-sandbox); the remaining seven follow the filesystem or github shape and are tracked in `GO_NO_GO.md` for the next grammar review. **MCP server author?** If your server isn't listed and you'd like a fixture review, [open an issue](https://github.com/razukc/capgate/issues/new) with a link to the manifest.
-
 ## Test strategy
 
 Golden files. One fixture manifest → one expected policy per adapter. Every PR that changes grammar, IR, or an adapter must update the golden files in the same commit. Reviewers read the diff. This is the primary correctness mechanism; unit tests on the grammar are secondary.
@@ -218,9 +267,9 @@ npm run test:update-goldens   # regenerate golden files after intentional change
 
 ## Contributing
 
-Design-partner stage. **Actively seeking feedback from teams reviewing MCP servers today** — please see [issue #1](https://github.com/razukc/capgate/issues/1) and share how your review process works (as much or as little as you can publicly). That is the single most valuable contribution right now.
-
 If you have a concrete manifest + unexpected compiler output, file an issue with both. See [CONTRIBUTING.md](CONTRIBUTING.md) for what else is useful.
+
+Design-partner stage: if you're already reviewing MCP servers in production and willing to share how your review process works, [issue #1](https://github.com/razukc/capgate/issues/1) has a question for you.
 
 ## Security
 
