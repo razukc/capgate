@@ -10,9 +10,9 @@ MCP servers today either run with full host trust (Claude Desktop, most wrappers
 manifest (JSON) → Capability[] → NormalizedPolicy → adapter (bwrap | docker) → argv + egress + env + assertions
 ```
 
-It is a compiler, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire. Its job is to make the sandbox boundary **reviewable in a PR before the first agent call** — what the server is allowed to reach lives in the repo, not in someone's `docker run` muscle memory.
+It is a **sandbox compiler for MCP servers**, not a runtime. It does not execute tools, resolve secrets, or speak MCP on the wire. Its job is to make the sandbox boundary **reviewable in a PR before the first agent call** — what the server is allowed to reach lives in the repo, not in someone's `docker run` muscle memory.
 
-**For platform and security engineers** who can't ship MCP servers under blanket host trust and don't want to hand-write bwrap argv or `docker run` flags per server. **Not for** end-user agent UIs (this isn't a runtime), or for teams who want post-hoc tool-call auditing (different layer — see [How capgate compares](#how-capgate-compares)).
+**For platform and security engineers** who can't ship MCP servers under blanket host trust and don't want to hand-write bwrap argv or `docker run` flags per server. **Not for** end-user agent UIs (this isn't a runtime), or for teams who want post-hoc tool-call auditing — that's a different lane (see [How capgate compares](#how-capgate-compares) below for the short version, or [A working map of MCP security tools](https://razukc.github.io/capgate/positioning/) for the full discussion).
 
 ---
 
@@ -154,16 +154,17 @@ Pin a minor range against `v0.0.x` for production review pipelines. Grammar addi
 
 ## How capgate compares
 
-MCP-server security splits across several layers. capgate sits at compile-time policy emission. The other layers are not competitors — most teams running MCP servers in production end up wanting more than one.
+MCP-server security splits across three lanes. capgate is in the static-technical lane. The other two aren't competitors — most teams running MCP servers in production end up wanting more than one.
 
-| Approach | What it does | When you'd use it |
+| Lane | What it does | When you'd use it |
 |---|---|---|
-| **Compile-time policy emission** (capgate) | Reads a manifest, emits sandbox argv + egress allowlist. Static artifact, no runtime. | You want the sandbox policy reviewable in PR before the server ever runs. |
-| **Runtime inspection** | Watches a running MCP server, flags risky tool calls against a threat catalog. | You want post-hoc audit signal on a server you didn't author. |
-| **Signed receipts / decision logs** | Cryptographically logs each tool invocation. | You need a tamper-evident trail of which tools ran with what arguments. |
-| **API gateway / per-request auth** | Authorizes each MCP request at a network boundary. | Your concern is *who* is allowed to call *which* tools, not what the tool can reach. |
+| **Static technical** (capgate) | Reads a manifest, emits sandbox argv + egress allowlist. Static artifact, no runtime. | You want the sandbox policy reviewable in PR before the server ever runs. |
+| **Static governance** | Reads a manifest, emits a compliance report against a threat catalog or policy framework. | You want a procedural sign-off on a server before it's adopted. |
+| **Dynamic attestation** | Logs and cryptographically signs each tool call at runtime. | You need a tamper-evident record of what the server actually did. |
 
-If you arrived here from a comparison post and you wanted runtime inspection or signed receipts, capgate isn't that — but the artifact it emits can be the input to either.
+Two adjacent concerns are *not* on this map: per-request authentication (gateways / OAuth — about *who* is calling) and runtime threat detection (pattern-watching, anomaly alerts — about flagging in real time). Both are real categories; both are different conversations. See [A working map of MCP security tools](https://razukc.github.io/capgate/positioning/) for the full discussion.
+
+If you arrived here from a comparison post and you wanted dynamic attestation or static governance, capgate isn't that — but the artifact it emits can be the input to either.
 
 ---
 
