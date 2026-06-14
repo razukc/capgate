@@ -1,0 +1,18 @@
+{
+  "target": "nftables",
+  "config": "# capgate-egress.nftables (generated — do not edit)\ntable inet capgate {\n  chain egress {\n    type filter hook output priority 0; policy drop;\n    ip daddr { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 169.254.0.0/16 } drop\n    ip6 daddr { ::1/128, fc00::/7, fe80::/10 } drop\n  }\n}",
+  "filename": "capgate-egress.nftables",
+  "unenforceable": [
+    {
+      "rule": {
+        "host": "*",
+        "port": null,
+        "blockPrivate": true
+      },
+      "reason": "nftables filters IPs, not hostnames; \"*\" cannot be expressed as an IP allowlist. Use the \"squid\" target for wildcard/hostname rules."
+    }
+  ],
+  "notes": [
+    "net: 1 rule(s) unenforceable by nftables (hostname/wildcard) — see unenforceable[]; compile those to the \"squid\" target."
+  ]
+}

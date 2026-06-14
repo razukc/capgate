@@ -47,10 +47,12 @@ One capability in, one container policy out. No declared network → `--network 
 ```bash
 capgate compile manifest.json --target bwrap  --pretty
 capgate compile manifest.json --target docker --pretty
+capgate compile manifest.json --target egress --egress-target squid    --pretty
+capgate compile manifest.json --target egress --egress-target nftables --pretty
 cat manifest.json | capgate compile - --target docker
 ```
 
-Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
+`--target egress` emits a static proxy config for a host-run proxy (`--egress-target squid|nftables`, default `squid`). Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
 
 ---
 
@@ -146,6 +148,7 @@ Full golden outputs: [`bwrap/github.json`](tests/fixtures/policy/policies/bwrap/
 | Capability string grammar (`fs`, `net`, `env`, `assert` kinds) | **Stable.** String form will not change; new refinements are additive. |
 | Adapter output shape (`argv`, `egress`, `envInjections`, `assertions`, `notes`) | **Stable.** Fields are additive; existing fields keep their semantics. |
 | `compile()` and `lowerToBwrap` / `lowerToDocker` exports | **Stable.** |
+| `lowerToEgress(policy, { target })` (`squid` / `nftables`) | **Usable.** Artifact shape (`config`, `filename`, `unenforceable`, `notes`) is additive; more `EgressTarget` values land without breaking existing ones. |
 | `exec`, `ipc`, `clock` capability kinds | **Usable.** May gain refinements (like `exec:?nestedSandbox=true` did); existing forms keep working. |
 | Adapter option objects (e.g. `lowerToDocker(policy, { readOnlyRootfs })`) | **Evolving.** Will expand in v0.1 as more adapters land. |
 | `assert:` validator hook | **Metadata-only in v0.0.x.** Runtime hook lands in v0.2. |
@@ -210,7 +213,7 @@ The grammar rejects ambiguity (relative paths, bad ports, non-UPPER_SNAKE env va
 
 **In scope:**
 - Capability grammar covering `fs`, `net`, `exec`, `env`, `ipc`, `clock`, `assert`.
-- Lowering to three targets: `bwrap` (Linux namespace sandbox), egress-proxy rules (net allowlist), Worker `resourceLimits` (in-process JS isolation).
+- Lowering to `bwrap` (Linux namespace sandbox), `docker` (`docker run` argv), and `egress` (proxy config — `squid` / `nftables`, **shipped**). Worker `resourceLimits` (in-process JS isolation) is the next target.
 - Golden-file tests from real MCP server manifests.
 
 **Out of scope (deferred):**
@@ -237,11 +240,11 @@ JSON-object capabilities are verbose and bury the kind under keys. The string fo
 
 Chromium carries its own sandbox that fights namespace isolation. Every production sandbox tool has a special case for this. Rather than a new capability kind, `nestedSandbox=true` is a refinement on an existing `exec:` capability — the adapter sees it during lowering and emits a different bwrap profile (user/pid/ipc namespaces kept for inner-sandbox compatibility). The IR stays small; the edge case is explicit and documented.
 
-### Why egress will lower to a proxy config, not a proxy (planned)
+### Why egress lowers to a proxy config, not a proxy
 
-Today `egress[]` is emitted by both adapters but enforced by neither — the host is told to wire a proxy. The neither-adapter-can-actually-do-net property is real: bwrap's `--unshare-net` is all-or-nothing (it always isolates now; see the net posture in `bwrap.ts`), and Docker's default bridge NATs but doesn't allowlist. Closing that gap by *running* a proxy would turn capgate into a gateway and drag a long-running, root-adjacent process into a library whose whole value is being a static compiler.
+`egress[]` is emitted by the bwrap and docker adapters but enforced by neither — the host is told to wire a proxy. The neither-adapter-can-actually-do-net property is real: bwrap's `--unshare-net` is all-or-nothing (it always isolates now; see the net posture in `bwrap.ts`), and Docker's default bridge NATs but doesn't allowlist. Closing that gap by *running* a proxy would turn capgate into a gateway and drag a long-running, root-adjacent process into a library whose whole value is being a static compiler.
 
-The planned move keeps capgate a compiler: a third lowering target, `lowerToEgress(policy, { target })`, compiles `policy.net` into a config blob for a proxy the host *already runs* — `squid` (allowlist by hostname via CONNECT, no TLS interception) and `nftables` (allowlist by IP+port in-kernel, bypass-proof, plus the `blockPrivate` drops) ship first. The artifact carries an `unenforceable[]` field naming every declared rule the chosen target *cannot* honor (e.g. nftables can't express `api.github.com`), so "portable" stays honest: it compiles everywhere and tells you what each backend loses. Envoy/Cloudflare/microVM targets are later entries behind the same `EgressTarget` switch; the IR does not change. This keeps Docker MCP Gateway and Cloudflare as *targets you compile to*, not competitors — the manifest stays the single reviewable source of truth, and enforcement is borrowed, not built.
+The move keeps capgate a compiler: a third lowering target, `lowerToEgress(policy, { target })`, compiles `policy.net` into a config blob for a proxy the host *already runs* — `squid` (allowlist by hostname via CONNECT, no TLS interception) and `nftables` (allowlist by IP+port in-kernel, bypass-proof, plus the `blockPrivate` drops) ship today. Both configs are fail-closed: squid ends in an unconditional `http_access deny all`, nftables defaults to `policy drop`, and an empty `policy.net` compiles to a deny-ALL config. The artifact carries an `unenforceable[]` field naming every declared rule the chosen target *cannot* honor (e.g. nftables can't express `api.github.com` — it filters IPs, not rotating hostnames), so "portable" stays honest: it compiles everywhere and tells you what each backend loses. Envoy/Cloudflare/microVM targets are later entries behind the same `EgressTarget` switch; the IR does not change. This keeps Docker MCP Gateway and Cloudflare as *targets you compile to*, not competitors — the manifest stays the single reviewable source of truth, and enforcement is borrowed, not built.
 
 ## Non-goals that matter
 
@@ -268,7 +271,7 @@ npm run test:update-goldens   # regenerate golden files after intentional change
 
 ## Open questions before v0.1
 
-1. **Egress proxy choice.** mitmproxy (great DX, slow, not prod-grade) vs nftables (hard to author, prod-grade, Linux-only) vs Envoy (prod-grade, ops-heavy). Direction settled: capgate stays a compiler and emits a config blob per target rather than running a proxy — see [Why egress will lower to a proxy config, not a proxy](#why-egress-will-lower-to-a-proxy-config-not-a-proxy-planned). Open sub-question is which target ships as the reference binding (`squid` vs `nftables`) and whether a dev-only mitmproxy emitter is worth carrying.
+1. **Egress proxy choice.** mitmproxy (great DX, slow, not prod-grade) vs nftables (hard to author, prod-grade, Linux-only) vs Envoy (prod-grade, ops-heavy). Direction settled: capgate stays a compiler and emits a config blob per target rather than running a proxy — see [Why egress lowers to a proxy config, not a proxy](#why-egress-lowers-to-a-proxy-config-not-a-proxy). Both `squid` and `nftables` now ship as reference bindings (they cover complementary cases — hostname-CONNECT vs in-kernel IP allowlist). Remaining sub-question is whether a dev-only mitmproxy emitter is worth carrying.
 2. **Path glob semantics.** bwrap binds directories, not globs. A `fs:read:/workspace/**` capability lowers to `--ro-bind /workspace /workspace`, which is a *superset* of the declared scope. Runtime enforcement of globs is an MCP-server concern.
 3. **Server-level vs tool-level capabilities.** v0.0 unions them. Finer-grained per-tool sandboxing (one sandbox per invocation) is possible but expensive — deferred until a user asks for it.
 

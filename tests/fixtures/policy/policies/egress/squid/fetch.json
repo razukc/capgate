@@ -1,0 +1,10 @@
+{
+  "target": "squid",
+  "config": "# capgate-egress.squid.conf (generated — do not edit)\nacl to_private dst 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8 169.254.0.0/16 ::1/128 fc00::/7 fe80::/10\nhttp_access deny to_private\nacl cg_dst_0 dstdomain .\nhttp_access allow cg_dst_0 CONNECT\nhttp_access deny all",
+  "filename": "capgate-egress.squid.conf",
+  "unenforceable": [],
+  "notes": [
+    "net[0]: host \"*\" degenerates to allow-any (dstdomain .) — squid cannot turn a wildcard into a restriction; only blockPrivate then constrains it.",
+    "net[0]: port null (any port) — no port acl emitted for *."
+  ]
+}

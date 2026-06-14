@@ -11,12 +11,14 @@
 // YAML output) belongs behind a feature flag, not here.
 
 import { readFileSync } from 'node:fs';
-import { compile, lowerToBwrap, lowerToDocker, CompilationError } from './policy/index.js';
+import { compile, lowerToBwrap, lowerToDocker, lowerToEgress, CompilationError } from './policy/index.js';
+import type { EgressTarget } from './policy/index.js';
 
 interface Args {
   command: string | undefined;
   input: string | undefined;
   target: string;
+  egressTarget: string;
   pretty: boolean;
   help: boolean;
 }
@@ -26,6 +28,7 @@ function parseArgs(argv: string[]): Args {
     command: undefined,
     input: undefined,
     target: 'bwrap',
+    egressTarget: 'squid',
     pretty: false,
     help: false,
   };
@@ -35,6 +38,7 @@ function parseArgs(argv: string[]): Args {
     if (a === '-h' || a === '--help') args.help = true;
     else if (a === '--pretty') args.pretty = true;
     else if (a === '--target') args.target = rest[++i];
+    else if (a === '--egress-target') args.egressTarget = rest[++i];
     else if (!args.command) args.command = a;
     else if (!args.input) args.input = a;
   }
@@ -47,13 +51,15 @@ Usage:
   capgate compile <manifest.json|-> [--target bwrap] [--pretty]
 
 Options:
-  --target <name>   Adapter to lower to. Default: bwrap. Supported: bwrap, docker.
-  --pretty          Indent JSON output with 2 spaces.
-  -h, --help        Show this message.
+  --target <name>          Adapter to lower to. Default: bwrap. Supported: bwrap, docker, egress.
+  --egress-target <name>   Egress backend when --target egress. Default: squid. Supported: squid, nftables.
+  --pretty                 Indent JSON output with 2 spaces.
+  -h, --help               Show this message.
 
 Examples:
   capgate compile manifests/filesystem.json --pretty
   cat manifest.json | capgate compile - --target bwrap
+  capgate compile manifests/github.json --target egress --egress-target nftables --pretty
 `;
 
 function readInput(path: string): string {
@@ -94,8 +100,17 @@ function main(): void {
       case 'docker':
         output = lowerToDocker(policy);
         break;
+      case 'egress':
+        if (args.egressTarget !== 'squid' && args.egressTarget !== 'nftables') {
+          process.stderr.write(
+            `capgate: unsupported --egress-target "${args.egressTarget}" (supported: squid, nftables)\n`
+          );
+          process.exit(2);
+        }
+        output = lowerToEgress(policy, { target: args.egressTarget as EgressTarget });
+        break;
       default:
-        process.stderr.write(`capgate: unsupported --target "${args.target}" (supported: bwrap, docker)\n`);
+        process.stderr.write(`capgate: unsupported --target "${args.target}" (supported: bwrap, docker, egress)\n`);
         process.exit(2);
     }
     const indent = args.pretty ? 2 : 0;

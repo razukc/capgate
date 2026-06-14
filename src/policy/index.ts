@@ -34,3 +34,6 @@ export type { BwrapArtifact, BwrapOptions, EgressRule } from './adapters/bwrap.j
 
 export { lowerToDocker } from './adapters/docker.js';
 export type { DockerArtifact, DockerOptions } from './adapters/docker.js';
+
+export { lowerToEgress } from './adapters/egress.js';
+export type { EgressArtifact, EgressOptions, EgressTarget } from './adapters/egress.js';
