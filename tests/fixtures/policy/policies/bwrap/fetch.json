@@ -2,6 +2,7 @@
   "argv": [
     "--unshare-uts",
     "--unshare-cgroup-try",
+    "--unshare-net",
     "--unshare-user-try",
     "--unshare-pid",
     "--unshare-ipc",
@@ -55,6 +56,6 @@
     }
   ],
   "notes": [
-    "net: 1 endpoint(s) declared — host MUST route outbound traffic through an egress proxy honoring egress[]"
+    "net: 1 endpoint(s) declared but NOT enforced by bwrap alone — bwrap always unshares the net namespace (no host network). To grant egress, a privileged broker MUST launch bwrap inside a pre-created network namespace whose egress honors egress[]. Absent that broker the sandbox has no network. Sharing the host netns is refused by design."
   ]
 }

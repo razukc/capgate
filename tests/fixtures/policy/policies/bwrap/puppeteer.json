@@ -2,6 +2,7 @@
   "argv": [
     "--unshare-uts",
     "--unshare-cgroup-try",
+    "--unshare-net",
     "--die-with-parent",
     "--new-session",
     "--ro-bind-try",
@@ -64,6 +65,6 @@
     "fs: \"/tmp/**\" lowered to directory bind \"/tmp\" — bwrap binds directories, not globs. Fine-grained glob enforcement is the server's job.",
     "fs: binding host /tmp exposes all user tmpfiles to the sandbox; prefer a scoped subdirectory like /tmp/<server-name>.",
     "exec: chromium (resolved from PATH inside sandbox)",
-    "net: 1 endpoint(s) declared — host MUST route outbound traffic through an egress proxy honoring egress[]"
+    "net: 1 endpoint(s) declared but NOT enforced by bwrap alone — bwrap always unshares the net namespace (no host network). To grant egress, a privileged broker MUST launch bwrap inside a pre-created network namespace whose egress honors egress[]. Absent that broker the sandbox has no network. Sharing the host netns is refused by design."
   ]
 }

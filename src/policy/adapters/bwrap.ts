@@ -10,6 +10,18 @@
 //   - seccomp syscall filters          → out of scope for v0.1
 //   - secret value resolution          → caller pulls from secret store
 //
+// Net posture (fail-closed). bwrap's --unshare-net is all-or-nothing: an
+// unprivileged user namespace cannot mint veth pairs or routes, so bwrap can
+// only fully isolate the net namespace or fully share the host's. Selective
+// egress is impossible inside bwrap alone. Therefore this adapter ALWAYS emits
+// --unshare-net — even when egress is declared — and NEVER shares the host
+// netns. A declared net capability does not relax isolation; it only records an
+// EgressRule[] that a privileged broker must honor by launching the bwrap
+// process inside a pre-created, egress-constrained network namespace. If no
+// such broker exists, the sandbox simply has no network: deny-by-default holds.
+// (The prior behavior — sharing host netns whenever net>0 — was a silent
+// privilege escalation that read as a constraint; it is refused by design.)
+//
 // This adapter emits a BwrapArtifact: argv for bwrap itself plus companion
 // data the host must honor. The host decides how to wire EgressRule — mitmproxy,
 // nftables, Envoy; the adapter stays policy-layer only.
@@ -51,13 +63,14 @@ export function lowerToBwrap(policy: NormalizedPolicy, opts: BwrapOptions = {}):
   const exposeDev = opts.exposeDev ?? policy.nestedSandbox;
 
   // ---------- base namespaces ----------
-  // We build the unshare set explicitly instead of using --unshare-all so the
-  // net flag is a single decision point. Net is only shared when policy.net
-  // is non-empty; nestedSandbox additionally keeps user/pid/ipc for inner
-  // sandboxes (Chromium, QEMU) that re-namespace themselves.
-  const shareNet = policy.net.length > 0;
-  argv.push('--unshare-uts', '--unshare-cgroup-try');
-  if (!shareNet) argv.push('--unshare-net');
+  // We build the unshare set explicitly instead of using --unshare-all so each
+  // namespace is an auditable decision point. Net is ALWAYS unshared: bwrap
+  // cannot do selective egress (see header), so sharing the host netns would be
+  // a silent grant of full host network access. Declared egress is carried in
+  // egress[] for an external netns broker to enforce, never by relaxing this.
+  // nestedSandbox additionally keeps user/pid/ipc for inner sandboxes
+  // (Chromium, QEMU) that re-namespace themselves.
+  argv.push('--unshare-uts', '--unshare-cgroup-try', '--unshare-net');
   if (!policy.nestedSandbox) {
     argv.push('--unshare-user-try', '--unshare-pid', '--unshare-ipc');
   } else {
@@ -140,8 +153,11 @@ export function lowerToBwrap(policy: NormalizedPolicy, opts: BwrapOptions = {}):
   // Values for envInjections are injected by the caller via --setenv at exec time.
 
   // ---------- net ----------
-  // bwrap has only binary share/unshare. Host-level allowlists live in the
-  // egress proxy. We emit rules either way so a deny-all proxy is a valid host.
+  // The net namespace is already unshared above, so the sandbox starts with NO
+  // network (loopback only). bwrap cannot open a constrained hole, so declared
+  // egress is NOT enforced here: we emit EgressRule[] for a privileged broker
+  // that runs this bwrap process inside a pre-created, egress-aware netns. We
+  // emit rules even for the empty case so a deny-all broker is a valid host.
   const egress: EgressRule[] = policy.net.map((n) => ({
     host: n.host,
     port: n.port,
@@ -149,7 +165,7 @@ export function lowerToBwrap(policy: NormalizedPolicy, opts: BwrapOptions = {}):
   }));
   if (policy.net.length > 0) {
     notes.push(
-      `net: ${policy.net.length} endpoint(s) declared — host MUST route outbound traffic through an egress proxy honoring egress[]`
+      `net: ${policy.net.length} endpoint(s) declared but NOT enforced by bwrap alone — bwrap always unshares the net namespace (no host network). To grant egress, a privileged broker MUST launch bwrap inside a pre-created network namespace whose egress honors egress[]. Absent that broker the sandbox has no network. Sharing the host netns is refused by design.`
     );
   }
 
