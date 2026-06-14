@@ -237,6 +237,12 @@ JSON-object capabilities are verbose and bury the kind under keys. The string fo
 
 Chromium carries its own sandbox that fights namespace isolation. Every production sandbox tool has a special case for this. Rather than a new capability kind, `nestedSandbox=true` is a refinement on an existing `exec:` capability — the adapter sees it during lowering and emits a different bwrap profile (user/pid/ipc namespaces kept for inner-sandbox compatibility). The IR stays small; the edge case is explicit and documented.
 
+### Why egress will lower to a proxy config, not a proxy (planned)
+
+Today `egress[]` is emitted by both adapters but enforced by neither — the host is told to wire a proxy. The neither-adapter-can-actually-do-net property is real: bwrap's `--unshare-net` is all-or-nothing (it always isolates now; see the net posture in `bwrap.ts`), and Docker's default bridge NATs but doesn't allowlist. Closing that gap by *running* a proxy would turn capgate into a gateway and drag a long-running, root-adjacent process into a library whose whole value is being a static compiler.
+
+The planned move keeps capgate a compiler: a third lowering target, `lowerToEgress(policy, { target })`, compiles `policy.net` into a config blob for a proxy the host *already runs* — `squid` (allowlist by hostname via CONNECT, no TLS interception) and `nftables` (allowlist by IP+port in-kernel, bypass-proof, plus the `blockPrivate` drops) ship first. The artifact carries an `unenforceable[]` field naming every declared rule the chosen target *cannot* honor (e.g. nftables can't express `api.github.com`), so "portable" stays honest: it compiles everywhere and tells you what each backend loses. Envoy/Cloudflare/microVM targets are later entries behind the same `EgressTarget` switch; the IR does not change. This keeps Docker MCP Gateway and Cloudflare as *targets you compile to*, not competitors — the manifest stays the single reviewable source of truth, and enforcement is borrowed, not built.
+
 ## Non-goals that matter
 
 - **The compiler does not decide trust.** Capability declarations come from the manifest; the compiler does not infer them from tool descriptions. Inference belongs in a separate auditing tool. A manifest that under-declares is a bug in the manifest.
@@ -262,7 +268,7 @@ npm run test:update-goldens   # regenerate golden files after intentional change
 
 ## Open questions before v0.1
 
-1. **Egress proxy choice.** mitmproxy (great DX, slow, not prod-grade) vs nftables (hard to author, prod-grade, Linux-only) vs Envoy (prod-grade, ops-heavy). Current plan: ship a thin YAML spec the compiler emits, plus one reference binding to mitmproxy for dev. Let ops pick their own enforcement.
+1. **Egress proxy choice.** mitmproxy (great DX, slow, not prod-grade) vs nftables (hard to author, prod-grade, Linux-only) vs Envoy (prod-grade, ops-heavy). Direction settled: capgate stays a compiler and emits a config blob per target rather than running a proxy — see [Why egress will lower to a proxy config, not a proxy](#why-egress-will-lower-to-a-proxy-config-not-a-proxy-planned). Open sub-question is which target ships as the reference binding (`squid` vs `nftables`) and whether a dev-only mitmproxy emitter is worth carrying.
 2. **Path glob semantics.** bwrap binds directories, not globs. A `fs:read:/workspace/**` capability lowers to `--ro-bind /workspace /workspace`, which is a *superset* of the declared scope. Runtime enforcement of globs is an MCP-server concern.
 3. **Server-level vs tool-level capabilities.** v0.0 unions them. Finer-grained per-tool sandboxing (one sandbox per invocation) is possible but expensive — deferred until a user asks for it.
 
