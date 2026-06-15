@@ -4,6 +4,20 @@ All notable changes to capgate will be documented here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.0.3] — 2026-06-15
+
+### Added
+- `lowerToEgress(policy, { target })` — third adapter. Compiles `policy.net` into a static config blob for a proxy the host already runs (capgate emits the config, it does not run the proxy), making the `egress[]` allowlist — previously enforced by neither bwrap nor docker — lowerable to something a host can enforce. Two targets behind one `EgressTarget` switch: `squid` (allowlist by hostname via CONNECT, no TLS interception) and `nftables` (allowlist by IP+port in-kernel, bypass-proof). The artifact carries an `unenforceable[]` field naming declared rules a given target cannot honor (e.g. nftables can't express rotating-CDN hostnames) — surfaced, never silently dropped.
+- CLI gains `--target egress` with `--egress-target squid|nftables` (default `squid`).
+- 21 egress unit tests + 4 golden fixtures (`squid`/`nftables` × `fetch`/`github`).
+
+### Changed
+- bwrap adapter never shares the host network namespace when egress is declared. Previously `--unshare-net` was omitted when `policy.net` was non-empty, intending "the host routes through an egress proxy"; the actual effect was the sandbox sharing the host netns with full, unrestricted reach (localhost, RFC1918, cloud metadata) while `egress[]` read as a restriction — a silent escalation. bwrap can't do selective egress (`--unshare-net` is all-or-nothing), so the lane now always isolates and the net note states plainly that declared egress is host-enforced, not bwrap-enforced.
+
+### Design notes
+- Fail-closed throughout the egress adapter: squid ends in an unconditional `http_access deny all`, nftables uses `policy drop`, empty `net` denies all egress, and `blockPrivate` is OR-ed so no single rule opts the proxy out of RFC1918/loopback/link-local drops.
+- Egress enforcement is a host-policy-layer concern: capgate stays a compiler and emits a config for a proxy the host already runs, rather than becoming a gateway. Docker MCP Gateway and Cloudflare remain targets, not competitors.
+
 ## [0.0.2] — 2026-05-03
 
 ### Added
