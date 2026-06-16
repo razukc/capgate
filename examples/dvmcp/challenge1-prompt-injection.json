@@ -1,0 +1,11 @@
+{
+  "name": "dvmcp-challenge1-userinfo",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "get_user_info",
+      "description": "Look up a user in an in-memory table (DVMCP ch1: pure prompt injection — no side effects)",
+      "capabilities": []
+    }
+  ]
+}

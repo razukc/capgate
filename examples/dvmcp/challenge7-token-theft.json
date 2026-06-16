@@ -1,0 +1,23 @@
+{
+  "name": "dvmcp-challenge7-email",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "check_email",
+      "description": "Check emails (DVMCP ch7: leaks bearer token + api key in error path)",
+      "capabilities": [
+        "net:connect:api.emailpro.com:443",
+        "env:inject:EMAILPRO_ACCESS_TOKEN",
+        "env:inject:EMAILPRO_API_KEY"
+      ]
+    },
+    {
+      "name": "send_email",
+      "description": "Send an email",
+      "capabilities": [
+        "net:connect:api.emailpro.com:443",
+        "env:inject:EMAILPRO_ACCESS_TOKEN"
+      ]
+    }
+  ]
+}

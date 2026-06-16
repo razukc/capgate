@@ -1,0 +1,20 @@
+{
+  "name": "dvmcp-challenge8-codeexec",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "get_system_info",
+      "description": "Return basic system info",
+      "capabilities": [
+        "clock:system"
+      ]
+    },
+    {
+      "name": "analyze_log_file",
+      "description": "Read and summarize a log file (DVMCP ch8: reads arbitrary path)",
+      "capabilities": [
+        "fs:read:/tmp/dvmcp_challenge8/logs/**"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "name": "dvmcp-challenge3-files",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "read_file",
+      "description": "Read a file from the public directory (DVMCP ch3: actually reads ANY path)",
+      "capabilities": [
+        "fs:read:/tmp/dvmcp_challenge3/public/**"
+      ]
+    },
+    {
+      "name": "search_files",
+      "description": "Search files in the public directory (DVMCP ch3: actually searches private too)",
+      "capabilities": [
+        "fs:read:/tmp/dvmcp_challenge3/public/**"
+      ]
+    }
+  ]
+}

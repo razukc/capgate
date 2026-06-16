@@ -1,0 +1,22 @@
+{
+  "name": "dvmcp-challenge9-netdiag",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "ping_host",
+      "description": "Ping a host (DVMCP ch9: shell=True command injection)",
+      "capabilities": [
+        "exec:spawn:ping",
+        "net:connect:*"
+      ]
+    },
+    {
+      "name": "traceroute",
+      "description": "Traceroute to a host",
+      "capabilities": [
+        "exec:spawn:traceroute",
+        "net:connect:*"
+      ]
+    }
+  ]
+}
