@@ -1,3 +1,8 @@
+---
+layout: default
+title: A working map of MCP security tools
+---
+
 # Static technical, static governance, dynamic attestation: a working map of MCP security tools
 
 capgate is a sandbox compiler for Model Context Protocol servers. It reads a manifest, parses the capability strings, and emits a sandbox configuration — bubblewrap argv or `docker run` flags — that the host can hand straight to the runtime. The artifact lives in the repo, reviewed in a PR, before the server ever runs.

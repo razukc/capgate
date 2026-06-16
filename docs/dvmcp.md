@@ -1,3 +1,9 @@
+---
+layout: default
+title: "I pointed capgate at Damn Vulnerable MCP"
+description: "A capability-compiler meets ten deliberately-broken MCP servers. The honest scorecard: it cleanly stops one class, contains several, and is useless against another."
+---
+
 # I pointed capgate at Damn Vulnerable MCP. Here's what the compiled policy caught — and what it couldn't.
 
 *A capability-compiler meets ten deliberately-broken MCP servers. The honest scorecard: it cleanly stops one class, shrinks the blast radius on several, and is useless against another. Knowing which is which is the whole point.*

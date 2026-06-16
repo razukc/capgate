@@ -1,3 +1,8 @@
+---
+layout: default
+title: Home
+---
+
 # capgate
 
 A sandbox compiler for Model Context Protocol servers. Reads a manifest, emits a sandbox configuration — bubblewrap argv or `docker run` flags — that your host can hand straight to the runtime. The sandbox boundary lives in the repo, reviewed in a PR, before the server ever runs.
