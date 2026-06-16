@@ -1,7 +1,7 @@
 # DVMCP capability manifests
 
 The honest-minimum capgate manifests used in the case study
-**"I pointed capgate at Damn Vulnerable MCP."**
+**["I pointed capgate at Damn Vulnerable MCP."](https://razukc.github.io/capgate/dvmcp/)**
 
 Each file declares what the corresponding [Damn Vulnerable MCP](https://github.com/harishsg993010/damn-vulnerable-MCP-server)
 challenge tool *claims* to need — not what its (deliberately broken) code actually does.
