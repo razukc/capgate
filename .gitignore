@@ -10,6 +10,3 @@ test-output.json
 .vscode/
 .claude/
 capgate-*.tgz
-
-# Private notes, outreach tracking, anything not for the public repo
-.local/
