@@ -185,3 +185,5 @@ node dist/cli.js compile examples/dvmcp/challenge9-command-injection.json --targ
 ```
 
 If you run MCP servers and decide their capability boundary by hand today — a devcontainer here, a mount list there — I'd genuinely like to know where that decision lives for you, and what it costs. That's the actual open question this whole exercise is circling.
+
+*There's a [discussion thread for this post on dev.to](https://dev.to/kcrazy/i-pointed-capgate-at-damn-vulnerable-mcp-heres-what-it-caught-and-what-it-couldnt-52i1) — that's the best place to tell me where that boundary decision lives for you.*
