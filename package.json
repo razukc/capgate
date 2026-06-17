@@ -1,6 +1,6 @@
 {
   "name": "capgate",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Compile MCP tool manifests into sandbox policies (bwrap, egress rules, and more).",
   "type": "module",
   "main": "dist/index.js",

@@ -55,6 +55,11 @@
     "GITHUB_PERSONAL_ACCESS_TOKEN"
   ],
   "assertions": [],
+  "provenance": {
+    "manifestHash": "sha256:d8da1f29408ab8473e2b5e67fd79b33e0996479e5181a7d2954e2d35f4a30b81",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "fs: \"/workspace/**\" lowered to directory bind \"/workspace\" — bwrap binds directories, not globs. Fine-grained glob enforcement is the server's job.",
     "net: 1 endpoint(s) declared but NOT enforced by bwrap alone — bwrap always unshares the net namespace (no host network). To grant egress, a privileged broker MUST launch bwrap inside a pre-created network namespace whose egress honors egress[]. Absent that broker the sandbox has no network. Sharing the host netns is refused by design."

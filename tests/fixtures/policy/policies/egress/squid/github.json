@@ -3,5 +3,10 @@
   "config": "# capgate-egress.squid.conf (generated — do not edit)\nacl to_private dst 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 127.0.0.0/8 169.254.0.0/16 ::1/128 fc00::/7 fe80::/10\nhttp_access deny to_private\nacl cg_dst_0 dstdomain api.github.com\nacl cg_port_0 port 443\nhttp_access allow cg_dst_0 cg_port_0 CONNECT\nhttp_access deny all",
   "filename": "capgate-egress.squid.conf",
   "unenforceable": [],
+  "provenance": {
+    "manifestHash": "sha256:d8da1f29408ab8473e2b5e67fd79b33e0996479e5181a7d2954e2d35f4a30b81",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": []
 }

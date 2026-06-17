@@ -20,6 +20,7 @@
 //     This adapter refuses to silently elevate.
 
 import { NormalizedPolicy } from '../ir.js';
+import type { Provenance } from '../provenance.js';
 import type { EgressRule } from './bwrap.js';
 
 export interface DockerArtifact {
@@ -31,6 +32,8 @@ export interface DockerArtifact {
   envInjections: string[];
   /** Declared assertions — emitted as metadata, not enforced here. */
   assertions: { id: string; description: string }[];
+  /** Binds this artifact to the capability manifest it was compiled from. Present when compiled via compile(). */
+  provenance?: Provenance;
   /** Human-readable diagnostics for audit logs / PR review. */
   notes: string[];
 }
@@ -162,6 +165,7 @@ export function lowerToDocker(policy: NormalizedPolicy, opts: DockerOptions = {}
     egress,
     envInjections,
     assertions: policy.assertions.map((a) => ({ id: a.id, description: a.description })),
+    ...(policy.provenance ? { provenance: policy.provenance } : {}),
     notes,
   };
 }

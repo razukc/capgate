@@ -25,6 +25,7 @@
 // net==0 (`--unshare-net` / `--network none`): declaring nothing grants nothing.
 
 import { NormalizedPolicy } from '../ir.js';
+import type { Provenance } from '../provenance.js';
 import type { EgressRule } from './bwrap.js';
 
 export type EgressTarget = 'squid' | 'nftables';
@@ -38,6 +39,8 @@ export interface EgressArtifact {
   filename: string;
   /** Declared rules this target CANNOT honor — surfaced, never silently dropped. */
   unenforceable: { rule: EgressRule; reason: string }[];
+  /** Binds this artifact to the capability manifest it was compiled from. Present when compiled via compile(). */
+  provenance?: Provenance;
   /** Human-readable diagnostics for audit logs / PR review. */
   notes: string[];
 }
@@ -64,8 +67,8 @@ export function lowerToEgress(policy: NormalizedPolicy, opts: EgressOptions): Eg
   // rule cannot opt the proxy out of a sibling rule's blockPrivate).
   const blockPrivate = rules.some((r) => r.blockPrivate);
 
-  if (opts.target === 'squid') return lowerToSquid(rules, blockPrivate);
-  if (opts.target === 'nftables') return lowerToNftables(rules, blockPrivate);
+  if (opts.target === 'squid') return lowerToSquid(rules, blockPrivate, policy.provenance);
+  if (opts.target === 'nftables') return lowerToNftables(rules, blockPrivate, policy.provenance);
   // Fail-closed on an unknown target rather than emitting a permissive default.
   throw new Error(`[EGRESS_UNKNOWN_TARGET] unsupported egress target "${(opts as { target: string }).target}"`);
 }
@@ -78,7 +81,11 @@ export function lowerToEgress(policy: NormalizedPolicy, opts: EgressOptions): Eg
 // the right target for rotating-CDN hostnames (api.github.com). IP-literal hosts
 // are matched with a `dst` acl instead of `dstdomain`. The deny-all terminator
 // is the last line, unconditional — nothing can be allowed past it.
-function lowerToSquid(rules: EgressRule[], blockPrivate: boolean): EgressArtifact {
+function lowerToSquid(
+  rules: EgressRule[],
+  blockPrivate: boolean,
+  provenance?: Provenance
+): EgressArtifact {
   const notes: string[] = [];
   const unenforceable: { rule: EgressRule; reason: string }[] = [];
   const lines: string[] = ['# capgate-egress.squid.conf (generated — do not edit)'];
@@ -132,6 +139,7 @@ function lowerToSquid(rules: EgressRule[], blockPrivate: boolean): EgressArtifac
     config: lines.join('\n'),
     filename: 'capgate-egress.squid.conf',
     unenforceable,
+    ...(provenance ? { provenance } : {}),
     notes,
   };
 }
@@ -145,7 +153,11 @@ function lowerToSquid(rules: EgressRule[], blockPrivate: boolean): EgressArtifac
 // rule — they are pushed to unenforceable[] with a reason pointing at the squid
 // target. blockPrivate drops are emitted FIRST (before accepts), and the chain
 // defaults to `policy drop` so anything not explicitly accepted is dropped.
-function lowerToNftables(rules: EgressRule[], blockPrivate: boolean): EgressArtifact {
+function lowerToNftables(
+  rules: EgressRule[],
+  blockPrivate: boolean,
+  provenance?: Provenance
+): EgressArtifact {
   const notes: string[] = [];
   const unenforceable: { rule: EgressRule; reason: string }[] = [];
   const body: string[] = [];
@@ -211,6 +223,7 @@ function lowerToNftables(rules: EgressRule[], blockPrivate: boolean): EgressArti
     config: lines.join('\n'),
     filename: 'capgate-egress.nftables',
     unenforceable,
+    ...(provenance ? { provenance } : {}),
     notes,
   };
 }

@@ -2,7 +2,7 @@
 // capgate CLI — thin wrapper over compile() + adapters.
 //
 // Usage:
-//   capgate compile <manifest.json> [--target bwrap] [--pretty]
+//   capgate compile <manifest.json> [--target bwrap|docker|egress] [--pretty]
 //
 // Reads JSON from a file path (or "-" for stdin), lowers to the requested
 // target, writes JSON to stdout. Errors go to stderr with a non-zero exit.
@@ -48,7 +48,7 @@ function parseArgs(argv: string[]): Args {
 const USAGE = `capgate — compile MCP manifests into sandbox policies
 
 Usage:
-  capgate compile <manifest.json|-> [--target bwrap] [--pretty]
+  capgate compile <manifest.json|-> [--target bwrap|docker|egress] [--pretty]
 
 Options:
   --target <name>          Adapter to lower to. Default: bwrap. Supported: bwrap, docker, egress.

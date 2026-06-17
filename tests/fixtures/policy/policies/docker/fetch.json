@@ -23,6 +23,11 @@
       "description": "outbound requests to private ranges must be rejected by the egress proxy"
     }
   ],
+  "provenance": {
+    "manifestHash": "sha256:4640312ccf5624e8705172f1ba19683a5d4094d9246b4b9f0d3193dbca554622",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "net: 1 endpoint(s) declared — host MUST attach the container to a network whose egress honors egress[]; do NOT use --network host"
   ]

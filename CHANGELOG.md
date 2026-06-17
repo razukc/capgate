@@ -4,6 +4,20 @@ All notable changes to capgate will be documented here. The format follows [Keep
 
 ## [Unreleased]
 
+## [0.0.4] — 2026-06-17
+
+### Added
+- **Manifest provenance.** Every compiled artifact now carries a `provenance` block: `{ manifestHash, grammarVersion, canonicalization }`. `manifestHash` is `"sha256:" + hex` over a canonical projection of capgate's *own* capability manifest (identity + declared capability strings), binding the emitted policy to the exact declaration it was compiled from. Compiling one manifest to bwrap, docker, and egress yields the **same** `manifestHash` across all three — one canonical form, every enforcement target bound to one anchor. New public API: `computeManifestHash`, `canonicalize`, `manifestProjection`, `provenanceFor`, `CANONICALIZATION`, and the `Provenance` / `ManifestProjection` types.
+- **Canonicalization** is RFC 8785 (JSON Canonicalization Scheme), hand-rolled and constrained to the value space a manifest projection occupies — keeping capgate's zero-runtime-dependency posture. It is **fail-closed**: a non-integer number, `NaN`, `Infinity`, or unsupported value throws `CompilationError` (`CANONICALIZATION_UNSUPPORTED`) rather than emitting bytes that might not reproduce elsewhere.
+- `provenance.test.ts` — JCS unit vectors, fail-closed guards, hash stability (key-reorder/whitespace → same hash), drift detection (capability change → different hash), and a known-answer SHA-256.
+
+### Changed
+- **Artifact output shape**: all three adapter artifacts (`BwrapArtifact`, `DockerArtifact`, `EgressArtifact`) gain an optional `provenance` field, present whenever the artifact was produced via `compile()`. Golden fixtures regenerated. (Pre-0.1, breaking-shape changes are expected per the versioning note above.)
+
+### Design notes
+- The hash covers only identity + capability strings — **not** `description` / `inputSchema` (informational, not policy-bearing) — so `manifestHash` is a *policy-drift* anchor: it changes iff the compiled policy could change, and a description edit does not invalidate an approved policy.
+- capgate is a **consumer** of this anchor: it hashes its own input and stamps it. It is not a producer of a public versioned hash format others must implement, and it does not ingest or hash an MCP *tool* manifest — capgate's capability manifest is a distinct document. The RFC 8785 profile means the bytes are nonetheless reproducible by anyone who canonicalizes the same projection.
+
 ## [0.0.3] — 2026-06-15
 
 ### Added

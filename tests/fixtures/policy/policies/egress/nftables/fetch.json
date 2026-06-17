@@ -12,6 +12,11 @@
       "reason": "nftables filters IPs, not hostnames; \"*\" cannot be expressed as an IP allowlist. Use the \"squid\" target for wildcard/hostname rules."
     }
   ],
+  "provenance": {
+    "manifestHash": "sha256:4640312ccf5624e8705172f1ba19683a5d4094d9246b4b9f0d3193dbca554622",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "net: 1 rule(s) unenforceable by nftables (hostname/wildcard) — see unenforceable[]; compile those to the \"squid\" target."
   ]

@@ -60,6 +60,11 @@
       "description": "evaluate() runs model-controlled JS in the page; host must treat output as untrusted"
     }
   ],
+  "provenance": {
+    "manifestHash": "sha256:77ed07deea05db7bc7f7a05ee4da6cc7effe2b4d88832620a0c27a9cb8ba164e",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "nestedSandbox: keeping user/pid/ipc namespaces for inner sandbox compatibility",
     "fs: \"/tmp/**\" lowered to directory bind \"/tmp\" — bwrap binds directories, not globs. Fine-grained glob enforcement is the server's job.",

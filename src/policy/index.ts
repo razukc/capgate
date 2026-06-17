@@ -29,6 +29,15 @@ export type { ParseResult } from './grammar.js';
 export { compile, parseManifest, normalize } from './compiler.js';
 export type { RawServerManifest, RawToolManifest } from './compiler.js';
 
+export {
+  canonicalize,
+  computeManifestHash,
+  manifestProjection,
+  provenanceFor,
+  CANONICALIZATION,
+} from './provenance.js';
+export type { Provenance, ManifestProjection } from './provenance.js';
+
 export { lowerToBwrap } from './adapters/bwrap.js';
 export type { BwrapArtifact, BwrapOptions, EgressRule } from './adapters/bwrap.js';
 
