@@ -12,6 +12,11 @@
       "reason": "nftables filters IPs, not hostnames; api.github.com resolves to rotating IPs. Use the 'squid' target for hostname rules, or pin to resolved CIDRs."
     }
   ],
+  "provenance": {
+    "manifestHash": "sha256:d8da1f29408ab8473e2b5e67fd79b33e0996479e5181a7d2954e2d35f4a30b81",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "net: 1 rule(s) unenforceable by nftables (hostname/wildcard) — see unenforceable[]; compile those to the \"squid\" target."
   ]

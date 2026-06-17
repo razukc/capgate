@@ -20,6 +20,7 @@ import {
   ServerManifest,
   ToolManifest,
 } from './ir.js';
+import { provenanceFor } from './provenance.js';
 
 // ---------------------------------------------------------------------------
 // Raw manifest shape — what we accept from JSON. Mirrors ir.ServerManifest
@@ -55,10 +56,14 @@ export function compile(raw: RawServerManifest): NormalizedPolicy {
     ...parsed.tools.flatMap((t) => t.capabilities),
   ];
 
-  return normalize(
+  const policy = normalize(
     { name: raw.name, version: raw.version },
     all
   );
+  // Bind the policy to the exact capability manifest it came from. Only compile()
+  // has the source manifest; normalize() stays manifest-agnostic.
+  policy.provenance = provenanceFor(raw);
+  return policy;
 }
 
 /** Parse a RawServerManifest into a ServerManifest with typed Capability[]. */

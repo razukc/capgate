@@ -146,7 +146,8 @@ Full golden outputs: [`bwrap/github.json`](tests/fixtures/policy/policies/bwrap/
 | Surface | Status in v0.0.x |
 |---|---|
 | Capability string grammar (`fs`, `net`, `env`, `assert` kinds) | **Stable.** String form will not change; new refinements are additive. |
-| Adapter output shape (`argv`, `egress`, `envInjections`, `assertions`, `notes`) | **Stable.** Fields are additive; existing fields keep their semantics. |
+| Adapter output shape (`argv`, `egress`, `envInjections`, `assertions`, `provenance`, `notes`) | **Stable.** Fields are additive; existing fields keep their semantics. |
+| `provenance` block (`manifestHash`, `grammarVersion`, `canonicalization`) | **Usable (v0.0.4+).** The RFC 8785 canonicalization profile and the `sha256:`-prefixed hash form are fixed; the projection it hashes (identity + capability strings) is additive. |
 | `compile()` and `lowerToBwrap` / `lowerToDocker` exports | **Stable.** |
 | `lowerToEgress(policy, { target })` (`squid` / `nftables`) | **Usable.** Artifact shape (`config`, `filename`, `unenforceable`, `notes`) is additive; more `EgressTarget` values land without breaking existing ones. |
 | `exec`, `ipc`, `clock` capability kinds | **Usable.** May gain refinements (like `exec:?nestedSandbox=true` did); existing forms keep working. |
@@ -154,6 +155,27 @@ Full golden outputs: [`bwrap/github.json`](tests/fixtures/policy/policies/bwrap/
 | `assert:` validator hook | **Metadata-only in v0.0.x.** Runtime hook lands in v0.2. |
 
 Pin a minor range against `v0.0.x` for production review pipelines. Grammar additions land in `v0.1`; existing strings keep parsing.
+
+## Provenance: binding a policy to its manifest
+
+Every compiled artifact carries a `provenance` block:
+
+```jsonc
+"provenance": {
+  "manifestHash": "sha256:6c73dbf717b5d228f2e349a03426a87454190c42f59e2833afe8c901dc610466",
+  "grammarVersion": "0.0",
+  "canonicalization": "RFC8785"
+}
+```
+
+`manifestHash` is SHA-256 over a canonical projection of the capability manifest — its identity (`name`, `version`) and declared capability strings, nothing else. It binds the emitted policy to the exact declaration it came from. Two properties fall out:
+
+- **Reproducible.** The same manifest produces the same hash regardless of key order or whitespace (the projection is canonicalized per [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), JSON Canonicalization Scheme). Compile one manifest to `bwrap`, `docker`, and `egress` and you get the **same** `manifestHash` in all three artifacts — one canonical form, every enforcement target bound to one anchor.
+- **A policy-drift anchor.** The hash covers what determines the policy. Edit a capability and the hash changes; edit a `description` and it does not — so a stale `manifestHash` is a genuine "the declared capabilities changed" signal, not noise from a doc tweak.
+
+Canonicalization is **fail-closed**: a value capgate can't canonicalize reproducibly (a non-integer number, `NaN`, `Infinity`) raises `CompilationError` rather than emitting bytes that might hash differently elsewhere.
+
+**One distinction worth stating plainly.** capgate's `manifestHash` is computed over *capgate's own capability manifest* — the document you write to declare what a server may do. That is a different artifact from an MCP *tool* manifest (the server's published `tools/list`). If you're composing capgate with a manifest-signing or call-attestation layer, capgate is a *consumer* of the canonical-bytes idea — it hashes its own input with a documented, reproducible profile — not a producer of a versioned hash format you must implement. The shared RFC 8785 profile is what lets independent layers agree on bytes without coordinating a bespoke convention.
 
 ## How capgate compares
 

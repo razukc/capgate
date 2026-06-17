@@ -24,6 +24,11 @@
     "GITHUB_PERSONAL_ACCESS_TOKEN"
   ],
   "assertions": [],
+  "provenance": {
+    "manifestHash": "sha256:d8da1f29408ab8473e2b5e67fd79b33e0996479e5181a7d2954e2d35f4a30b81",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "net: 1 endpoint(s) declared — host MUST attach the container to a network whose egress honors egress[]; do NOT use --network host",
     "fs: \"/workspace/**\" lowered to volume mount \"/workspace\" — Docker mounts directories, not globs. Fine-grained glob enforcement is the server's job."

@@ -47,6 +47,11 @@
   "egress": [],
   "envInjections": [],
   "assertions": [],
+  "provenance": {
+    "manifestHash": "sha256:c11fb317f65f860e3b7cdc0ebd4bc384242d11c0aef445f97bde8e5f0f0af5a0",
+    "grammarVersion": "0.0",
+    "canonicalization": "RFC8785"
+  },
   "notes": [
     "fs: \"/workspace/**\" lowered to directory bind \"/workspace\" — bwrap binds directories, not globs. Fine-grained glob enforcement is the server's job."
   ]

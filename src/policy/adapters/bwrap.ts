@@ -27,6 +27,7 @@
 // nftables, Envoy; the adapter stays policy-layer only.
 
 import { NormalizedPolicy } from '../ir.js';
+import type { Provenance } from '../provenance.js';
 
 export interface BwrapArtifact {
   /** argv, ready for execFile("bwrap", argv). Binary and command are appended by caller. */
@@ -37,6 +38,8 @@ export interface BwrapArtifact {
   envInjections: string[];
   /** Declared assertions — emitted as metadata, not enforced here. */
   assertions: { id: string; description: string }[];
+  /** Binds this artifact to the capability manifest it was compiled from. Present when compiled via compile(). */
+  provenance?: Provenance;
   /** Human-readable diagnostics for audit logs / PR review. */
   notes: string[];
 }
@@ -174,6 +177,7 @@ export function lowerToBwrap(policy: NormalizedPolicy, opts: BwrapOptions = {}):
     egress,
     envInjections,
     assertions: policy.assertions.map((a) => ({ id: a.id, description: a.description })),
+    ...(policy.provenance ? { provenance: policy.provenance } : {}),
     notes,
   };
 }

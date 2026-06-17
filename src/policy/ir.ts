@@ -10,6 +10,8 @@
 // - Fail-closed: unknown kinds, malformed scopes, and missing required fields
 //   MUST cause CompilationError. No best-effort. No silent drops.
 
+import type { Provenance } from './provenance.js';
+
 // ---------------------------------------------------------------------------
 // Capability kinds
 // ---------------------------------------------------------------------------
@@ -133,6 +135,12 @@ export interface ServerManifest {
 export interface NormalizedPolicy {
   /** Server identity — carried through for logging and provenance. */
   server: { name: string; version: string };
+  /**
+   * Provenance binding this policy to the exact capability manifest it was
+   * compiled from. Present when produced via compile() (which sees the source
+   * manifest); absent when a NormalizedPolicy is built directly via normalize().
+   */
+  provenance?: Provenance;
   /** Deduped, merged fs roots. Write implies read. */
   fs: { path: string; actions: FsAction[]; isGlob: boolean }[];
   /** Deduped net endpoints. blockPrivate is OR-ed across merges. */
