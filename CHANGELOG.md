@@ -16,7 +16,7 @@ All notable changes to capgate will be documented here. The format follows [Keep
 
 ### Design notes
 - The hash covers only identity + capability strings — **not** `description` / `inputSchema` (informational, not policy-bearing) — so `manifestHash` is a *policy-drift* anchor: it changes iff the compiled policy could change, and a description edit does not invalidate an approved policy.
-- capgate is a **consumer** of this anchor: it hashes its own input and stamps it. It is not a producer of a public versioned hash format others must implement, and it does not ingest or hash an MCP *tool* manifest — capgate's capability manifest is a distinct document. The RFC 8785 profile means the bytes are nonetheless reproducible by anyone who canonicalizes the same projection.
+- capgate is a **consumer** of this anchor: it hashes its own input and stamps it. It is not a producer of a public versioned hash format others must implement, and it does not ingest, verify, or hash an MCP *tool* manifest — capgate's capability manifest is a distinct document. The two are siblings — same RFC 8785 scheme, different documents — so a host composing capgate with `io.modelcontextprotocol/signed-manifests` (§6) carries both hashes in host state (no carrier field in capgate artifacts); the bytes remain reproducible by anyone who canonicalizes the same projection. This separation is intentional and permanent.
 
 ## [0.0.3] — 2026-06-15
 

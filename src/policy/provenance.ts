@@ -3,16 +3,23 @@
 //
 // Why this exists:
 //   A signed manifest proves the declaration didn't change. A compiled sandbox
-//   enforces it. For those two to be talking about the SAME artifact, both must
-//   key off one canonical form of the manifest. capgate computes a `manifestHash`
-//   over its OWN canonical capability manifest and stamps it on every artifact, so
-//   the emitted policy is provably the policy for these exact declared bytes.
+//   enforces it. When a host composes the two, each layer needs a reproducible
+//   anchor for the artifact it covers. capgate computes a `manifestHash` over its
+//   OWN canonical capability manifest and stamps it on every artifact, so the
+//   emitted policy is provably the policy for these exact declared bytes. The
+//   anchor is a sibling — not the same artifact — as a signed MCP tool manifest's
+//   manifestHash (e.g. io.modelcontextprotocol/signed-manifests §6): same RFC 8785
+//   scheme, different document. Composing the two means carrying both hashes and
+//   treating a mismatch as a host-level re-consent/refuse decision.
 //
 // Scope discipline:
 //   capgate is a CONSUMER of this anchor — it hashes its own input. It is NOT a
 //   producer of a public versioned hash format others must implement. The hash is
 //   over capgate's *capability* manifest, which is a DIFFERENT document from an MCP
-//   *tool* manifest. We deliberately do not ingest or hash the latter.
+//   *tool* manifest. We deliberately do not ingest, verify, or hash the latter;
+//   direct consumption of a tool-manifest manifestHash would require ingesting that
+//   format and is intentionally out of scope — not built and not planned. No carrier
+//   field for an external manifestHash will be added; composition stays host-side.
 //
 // Canonicalization:
 //   RFC 8785 (JSON Canonicalization Scheme), constrained to the value space a
