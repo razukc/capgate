@@ -22,6 +22,7 @@
 import { NormalizedPolicy } from '../ir.js';
 import type { Provenance } from '../provenance.js';
 import type { EgressRule } from './bwrap.js';
+import { assertSupported } from './support.js';
 
 export interface DockerArtifact {
   /** argv, ready for execFile("docker", ["run", ...argv, image, ...cmd]). */
@@ -50,6 +51,8 @@ export interface DockerOptions {
    * adapter's output is portable across images.
    */
   user?: string;
+  /** Strict fail-closed: throw ADAPTER_UNSUPPORTED on unsupported kinds (default true). Set false for permissive notes. */
+  strict?: boolean;
 }
 
 const SAFE_DEFAULTS = {
@@ -57,6 +60,7 @@ const SAFE_DEFAULTS = {
 };
 
 export function lowerToDocker(policy: NormalizedPolicy, opts: DockerOptions = {}): DockerArtifact {
+  assertSupported(policy, 'docker', { strict: opts.strict });
   const argv: string[] = [];
   const notes: string[] = [];
   const readOnlyRootfs = opts.readOnlyRootfs ?? SAFE_DEFAULTS.readOnlyRootfs;

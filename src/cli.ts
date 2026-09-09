@@ -20,6 +20,7 @@ interface Args {
   target: string;
   egressTarget: string;
   pretty: boolean;
+  permissive: boolean;
   help: boolean;
 }
 
@@ -30,6 +31,7 @@ function parseArgs(argv: string[]): Args {
     target: 'bwrap',
     egressTarget: 'squid',
     pretty: false,
+    permissive: false,
     help: false,
   };
   const rest = argv.slice(2);
@@ -37,6 +39,7 @@ function parseArgs(argv: string[]): Args {
     const a = rest[i];
     if (a === '-h' || a === '--help') args.help = true;
     else if (a === '--pretty') args.pretty = true;
+    else if (a === '--permissive') args.permissive = true;
     else if (a === '--target') args.target = rest[++i];
     else if (a === '--egress-target') args.egressTarget = rest[++i];
     else if (!args.command) args.command = a;
@@ -48,18 +51,20 @@ function parseArgs(argv: string[]): Args {
 const USAGE = `capgate — compile MCP manifests into sandbox policies
 
 Usage:
-  capgate compile <manifest.json|-> [--target bwrap|docker|egress] [--pretty]
+  capgate compile <manifest.json|-> [--target bwrap|docker|egress] [--pretty] [--permissive]
 
 Options:
   --target <name>          Adapter to lower to. Default: bwrap. Supported: bwrap, docker, egress.
   --egress-target <name>   Egress backend when --target egress. Default: squid. Supported: squid, nftables.
   --pretty                 Indent JSON output with 2 spaces.
+  --permissive             Allow partial lowering: unsupported kinds emit notes/unenforceable instead of ADAPTER_UNSUPPORTED (default: strict fail-closed).
   -h, --help               Show this message.
 
 Examples:
   capgate compile manifests/filesystem.json --pretty
   cat manifest.json | capgate compile - --target bwrap
   capgate compile manifests/github.json --target egress --egress-target nftables --pretty
+  capgate compile manifests/filesystem.json --target egress --permissive --pretty
 `;
 
 function readInput(path: string): string {
@@ -92,13 +97,14 @@ function main(): void {
 
   try {
     const policy = compile(raw as Parameters<typeof compile>[0]);
+    const strict = !args.permissive;
     let output: unknown;
     switch (args.target) {
       case 'bwrap':
-        output = lowerToBwrap(policy);
+        output = lowerToBwrap(policy, { strict });
         break;
       case 'docker':
-        output = lowerToDocker(policy);
+        output = lowerToDocker(policy, { strict });
         break;
       case 'egress':
         if (args.egressTarget !== 'squid' && args.egressTarget !== 'nftables') {
@@ -107,7 +113,7 @@ function main(): void {
           );
           process.exit(2);
         }
-        output = lowerToEgress(policy, { target: args.egressTarget as EgressTarget });
+        output = lowerToEgress(policy, { target: args.egressTarget as EgressTarget, strict });
         break;
       default:
         process.stderr.write(`capgate: unsupported --target "${args.target}" (supported: bwrap, docker, egress)\n`);

@@ -32,7 +32,11 @@ describe('egress adapter — golden files', () => {
       it(`${name}.json → policies/egress/${target}/${name}.json`, () => {
         const raw = JSON.parse(readFileSync(join(FIXTURE_ROOT, 'manifests', `${name}.json`), 'utf8'));
         const policy = compile(raw);
-        const artifact = lowerToEgress(policy, { target });
+        // Goldens were created before strict ADAPTER_UNSUPPORTED: github.json carries
+        // fs+env alongside net, which egress strict would reject. Keep goldens
+        // permissive so the emitted proxy config remains reviewable; strict behaviour
+        // is covered in adapter.unsupported.test.ts and via CLI --permissive.
+        const artifact = lowerToEgress(policy, { target, strict: false });
 
         const serialized = serialize(artifact);
         const goldenPath = join(FIXTURE_ROOT, 'policies', 'egress', target, `${name}.json`);

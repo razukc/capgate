@@ -28,6 +28,7 @@
 
 import { NormalizedPolicy } from '../ir.js';
 import type { Provenance } from '../provenance.js';
+import { assertSupported } from './support.js';
 
 export interface BwrapArtifact {
   /** argv, ready for execFile("bwrap", argv). Binary and command are appended by caller. */
@@ -55,11 +56,14 @@ export interface BwrapOptions {
   systemMounts?: string[];
   /** Whether to expose /dev (true when nestedSandbox, false otherwise). */
   exposeDev?: boolean;
+  /** Strict fail-closed: throw ADAPTER_UNSUPPORTED on unsupported kinds (default true). Set false for permissive notes. */
+  strict?: boolean;
 }
 
 const DEFAULT_SYSTEM_MOUNTS = ['/usr', '/lib', '/lib64', '/bin', '/sbin', '/etc/ssl', '/etc/ca-certificates'];
 
 export function lowerToBwrap(policy: NormalizedPolicy, opts: BwrapOptions = {}): BwrapArtifact {
+  assertSupported(policy, 'bwrap', { strict: opts.strict });
   const argv: string[] = [];
   const notes: string[] = [];
   const systemMounts = opts.systemMounts ?? DEFAULT_SYSTEM_MOUNTS;

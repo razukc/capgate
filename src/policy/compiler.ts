@@ -283,6 +283,16 @@ function assertManifestShape(raw: RawServerManifest): void {
   if (raw.serverCapabilities && !Array.isArray(raw.serverCapabilities)) {
     throw new CompilationError('MANIFEST_SHAPE', 'manifest.serverCapabilities must be an array');
   }
+  if (raw.serverCapabilities) {
+    for (const [j, c] of raw.serverCapabilities.entries()) {
+      if (typeof c !== 'string') {
+        throw new CompilationError('MANIFEST_SHAPE', `serverCapabilities[${j}] must be a string`, {
+          index: j,
+          value: c,
+        });
+      }
+    }
+  }
   for (const [i, t] of raw.tools.entries()) {
     if (!t || typeof t !== 'object') {
       throw new CompilationError('MANIFEST_SHAPE', `tools[${i}] must be an object`);
@@ -292,6 +302,15 @@ function assertManifestShape(raw: RawServerManifest): void {
     }
     if (!Array.isArray(t.capabilities)) {
       throw new CompilationError('MANIFEST_SHAPE', `tools[${i}].capabilities must be an array`);
+    }
+    for (const [j, c] of (t.capabilities as unknown[]).entries()) {
+      if (typeof c !== 'string') {
+        throw new CompilationError('MANIFEST_SHAPE', `tools[${i}].capabilities[${j}] must be a string`, {
+          toolIndex: i,
+          capIndex: j,
+          value: c,
+        });
+      }
     }
   }
 }

@@ -27,6 +27,7 @@
 import { NormalizedPolicy } from '../ir.js';
 import type { Provenance } from '../provenance.js';
 import type { EgressRule } from './bwrap.js';
+import { assertSupported } from './support.js';
 
 export type EgressTarget = 'squid' | 'nftables';
 
@@ -48,6 +49,8 @@ export interface EgressArtifact {
 export interface EgressOptions {
   /** Required — no default. The caller must pick the backend the host runs. */
   target: EgressTarget;
+  /** Strict fail-closed: throw ADAPTER_UNSUPPORTED when policy contains fs/exec/env/ipc/clock (default true). Set false for permissive notes. */
+  strict?: boolean;
 }
 
 // Private-range destinations the blockPrivate flag must deny. Kept as two lists
@@ -57,6 +60,7 @@ const PRIVATE_V4 = ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/
 const PRIVATE_V6 = ['::1/128', 'fc00::/7', 'fe80::/10'];
 
 export function lowerToEgress(policy: NormalizedPolicy, opts: EgressOptions): EgressArtifact {
+  assertSupported(policy, 'egress', { strict: opts.strict });
   const rules: EgressRule[] = policy.net.map((n) => ({
     host: n.host,
     port: n.port,

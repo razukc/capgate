@@ -46,3 +46,6 @@ export type { DockerArtifact, DockerOptions } from './adapters/docker.js';
 
 export { lowerToEgress } from './adapters/egress.js';
 export type { EgressArtifact, EgressOptions, EgressTarget } from './adapters/egress.js';
+
+export { assertSupported } from './adapters/support.js';
+export type { AdapterName } from './adapters/support.js';

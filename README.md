@@ -52,7 +52,7 @@ capgate compile manifest.json --target egress --egress-target nftables --pretty
 cat manifest.json | capgate compile - --target docker
 ```
 
-`--target egress` emits a static proxy config for a host-run proxy (`--egress-target squid|nftables`, default `squid`). Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
+`--target egress` emits a static proxy config for a host-run proxy (`--egress-target squid|nftables`, default `squid`). Strict fail-closed by default (`ADAPTER_UNSUPPORTED` on `fs`/`exec`/`env`/`ipc`/`clock` for `egress`); `--permissive` opts into `notes`/`unenforceable` instead. Exits non-zero on parse errors (3), unknown arguments (2), or `CompilationError` (4). See `capgate --help`.
 
 ---
 
@@ -285,10 +285,10 @@ The move keeps capgate a compiler: a third lowering target, `lowerToEgress(polic
 ## Failure modes
 
 - Unknown capability kind → `CompilationError('CAP_UNKNOWN_KIND')`.
-- Capability a configured adapter cannot lower → `CompilationError('ADAPTER_UNSUPPORTED')` *(impl. pending)*.
+- Capability a configured adapter cannot lower → `CompilationError('ADAPTER_UNSUPPORTED')` (strict by default; `--permissive` opts into `notes`/`unenforceable` instead).
 - Manifest missing required fields → `CompilationError('MANIFEST_SHAPE')`.
 
-All compilation errors are fatal. There is no warning mode.
+All compilation errors are fatal. There is no warning mode. `bwrap` and `docker` support `fs|net|exec|env|ipc|clock|assert`; `egress` is `net|assert`-only — `egress` with `fs`/`exec`/`env`/`ipc`/`clock` fails in strict mode (default) and emits permissive notes only with `--permissive` (auditable opt-in).
 
 ## Test strategy
 

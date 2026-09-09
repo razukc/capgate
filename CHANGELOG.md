@@ -4,6 +4,15 @@ All notable changes to capgate will be documented here. The format follows [Keep
 
 ## [Unreleased]
 
+### Added
+- `assertSupported` + strict-by-default `ADAPTER_UNSUPPORTED` (`src/policy/adapters/support.ts`). `bwrap`/`docker` support `fs|net|exec|env|ipc|clock|assert`; `egress` is `net|assert`-only — `egress` with `fs`/`exec`/`env`/`ipc`/`clock` now throws `CompilationError('ADAPTER_UNSUPPORTED')` unless `--permissive` / `{ strict: false }` opts into `notes`/`unenforceable`. `BwrapOptions`/`DockerOptions`/`EgressOptions` gain `strict?: boolean` (default `true`). CLI gains `--permissive`. Exported `assertSupported` + `AdapterName` from public surface.
+
+### Changed
+- `assertManifestShape` now validates each `serverCapabilities` / `tools[].capabilities` element is a string with indexed `CompilationError('MANIFEST_SHAPE')` context.
+
+### Design notes
+- Strict-by-default aligns `ADAPTER_UNSUPPORTED` with existing fail-closed codes (`CAP_UNKNOWN_KIND`, `CANONICALIZATION_UNSUPPORTED`, `MANIFEST_SHAPE`): no silent partial artifact. Permissive is auditable opt-in (flag in CI YAML) mirroring `egress` `unenforceable[]` honesty.
+
 ## [0.0.4] — 2026-06-17
 
 ### Added
@@ -62,4 +71,3 @@ Initial design-partner preview release.
 - Only the `bwrap` adapter ships in v0.0. Firecracker, E2B, Daytona, and Worker adapters are deferred.
 - Manifest schema validation is shape-only; no Zod schema yet (planned for v0.1).
 - No secret resolution — `env:inject:*` carries names only.
-- `ADAPTER_UNSUPPORTED` compilation error is reserved but not yet raised (adapters currently accept every capability type).
